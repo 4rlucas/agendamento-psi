@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agenda · Recepção</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#f3f5f2;
+    --surface:#ffffff;
+    --ink:#1c2723;
+    --ink-soft:#5a6b64;
+    --line:#dde4df;
+    --sage:#3f6b5a;      /* verde petróleo suave */
+    --sage-deep:#2c4d40;
+    --sage-tint:#e8efeb;
+    --amber:#c98a3a;     /* acento quente pontual */
+    --danger:#b4453a;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(28,39,35,.04), 0 8px 24px rgba(28,39,35,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Inter',system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);
+    line-height:1.5;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:0 20px}
+
+  /* ---------- topbar ---------- */
+  header{
+    background:var(--sage-deep);color:#eef3f0;
+    padding:18px 0;position:sticky;top:0;z-index:20;
+  }
+  header .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:600}
+  .brand .dot{width:11px;height:11px;border-radius:50%;
+    background:var(--amber);box-shadow:0 0 0 4px rgba(201,138,58,.25)}
+  .brand small{display:block;font-weight:400;font-size:12px;opacity:.7;letter-spacing:.02em}
+  .who{display:flex;align-items:center;gap:14px;font-size:13px}
+  .who button{
+    background:rgba(255,255,255,.1);color:#eef3f0;border:1px solid rgba(255,255,255,.18);
+    padding:7px 13px;border-radius:9px;font-size:13px;cursor:pointer;font-family:inherit;
+  }
+  .who button:hover{background:rgba(255,255,255,.18)}
+
+  /* ---------- login ---------- */
+  .login-screen{min-height:100vh;display:grid;place-items:center;padding:24px}
+  .login-card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:36px 34px;width:100%;max-width:400px;
+  }
+  .login-card h1{
+    font-family:'Fraunces',serif;font-weight:500;font-size:27px;
+    margin-bottom:6px;letter-spacing:-.01em;
+  }
+  .login-card p.sub{color:var(--ink-soft);font-size:14px;margin-bottom:26px}
+  label{display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--ink)}
+  input,select,textarea{
+    width:100%;font-family:inherit;font-size:15px;color:var(--ink);
+    background:#fbfcfb;border:1px solid var(--line);border-radius:10px;
+    padding:11px 13px;transition:border-color .15s, box-shadow .15s;
+  }
+  input:focus,select:focus,textarea:focus{
+    outline:none;border-color:var(--sage);box-shadow:0 0 0 3px var(--sage-tint);
+  }
+  .field{margin-bottom:16px}
+  .btn{
+    font-family:inherit;font-size:15px;font-weight:500;cursor:pointer;
+    border:none;border-radius:10px;padding:12px 18px;transition:background .15s,opacity .15s;
+  }
+  .btn-primary{background:var(--sage);color:#fff;width:100%}
+  .btn-primary:hover{background:var(--sage-deep)}
+  .btn-primary:disabled{opacity:.55;cursor:not-allowed}
+  .err{color:var(--danger);font-size:13px;margin-top:12px;min-height:18px}
+
+  /* ---------- app ---------- */
+  main{padding:32px 0 80px}
+  .page-title{
+    font-family:'Fraunces',serif;font-weight:500;font-size:26px;
+    letter-spacing:-.01em;margin-bottom:4px;
+  }
+  .page-sub{color:var(--ink-soft);font-size:14px;margin-bottom:26px}
+
+  /* stepper */
+  .steps{display:flex;gap:0;margin-bottom:26px;flex-wrap:wrap}
+  .step{
+    display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft);
+    padding:6px 16px 6px 0;
+  }
+  .step .num{
+    width:24px;height:24px;border-radius:50%;display:grid;place-items:center;
+    font-size:12px;font-weight:600;background:var(--line);color:var(--ink-soft);
+    transition:background .2s,color .2s;
+  }
+  .step.active{color:var(--ink);font-weight:500}
+  .step.active .num{background:var(--sage);color:#fff}
+  .step.done .num{background:var(--sage-tint);color:var(--sage)}
+
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:24px;margin-bottom:18px;
+  }
+  .card h2{font-size:15px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:9px}
+  .card h2 .idx{color:var(--amber);font-family:'Fraunces',serif;font-size:16px}
+
+  /* psicólogo picker */
+  .psi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+  .psi{
+    text-align:left;background:#fbfcfb;border:1.5px solid var(--line);border-radius:12px;
+    padding:15px 16px;cursor:pointer;transition:border-color .15s,background .15s;font-family:inherit;
+  }
+  .psi:hover{border-color:var(--sage);background:var(--sage-tint)}
+  .psi.sel{border-color:var(--sage);background:var(--sage-tint)}
+  .psi .nome{font-weight:600;font-size:15px;color:var(--ink)}
+  .psi .esp{font-size:13px;color:var(--ink-soft);margin-top:2px}
+
+  /* date picker */
+  .date-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+  .date-row .field{margin-bottom:0;flex:1;min-width:180px}
+
+  /* horários */
+  .slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px}
+  .slot{
+    background:#fbfcfb;border:1.5px solid var(--line);border-radius:10px;
+    padding:12px 0;text-align:center;font-size:15px;font-weight:500;cursor:pointer;
+    font-family:inherit;color:var(--ink);transition:border-color .15s,background .15s;
+  }
+  .slot:hover{border-color:var(--sage);background:var(--sage-tint)}
+  .slot.sel{background:var(--sage);border-color:var(--sage);color:#fff}
+  .empty{color:var(--ink-soft);font-size:14px;padding:8px 0}
+
+  /* confirm */
+  .confirm-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .confirm-grid .full{grid-column:1/-1}
+  .summary{
+    background:var(--sage-tint);border-radius:12px;padding:16px 18px;margin-bottom:20px;
+    font-size:14px;color:var(--sage-deep);
+  }
+  .summary b{font-weight:600}
+  .summary .line{display:flex;gap:8px;margin-bottom:4px}
+  .summary .line:last-child{margin-bottom:0}
+  .summary .k{opacity:.7;min-width:78px}
+
+  .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
+  .btn-ghost{background:transparent;color:var(--ink-soft);border:1px solid var(--line)}
+  .btn-ghost:hover{background:var(--bg)}
+  .btn-confirm{background:var(--sage);color:#fff;min-width:180px}
+  .btn-confirm:hover{background:var(--sage-deep)}
+  .btn-confirm:disabled{opacity:.55;cursor:not-allowed}
+
+  .hidden{display:none!important}
+  .loading{color:var(--ink-soft);font-size:14px;padding:6px 0}
+
+  /* toast */
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--sage-deep);color:#fff;padding:13px 22px;border-radius:11px;
+    font-size:14px;box-shadow:var(--shadow);opacity:0;pointer-events:none;
+    transition:opacity .25s,transform .25s;z-index:50;max-width:90vw;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.err{background:var(--danger)}
+
+  @media (max-width:560px){
+    .confirm-grid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <h1>Agenda</h1>
+    <p class="sub">Acesso da recepção</p>
+    <div class="field">
+      <label for="email">E-mail</label>
+      <input id="email" type="email" autocomplete="username" placeholder="voce@clinica.com">
+    </div>
+    <div class="field">
+      <label for="senha">Senha</label>
+      <input id="senha" type="password" autocomplete="current-password" placeholder="••••••••">
+    </div>
+    <button id="btnLogin" class="btn btn-primary">Entrar</button>
+    <div id="loginErr" class="err"></div>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="app" class="hidden">
+  <header>
+    <div class="wrap">
+      <div class="brand">
+        <span class="dot"></span>
+        <div>Agenda<small id="userLabel">Recepção</small></div>
+      </div>
+      <div class="who">
+        <button id="btnLogout">Sair</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="page-title">Marcar consulta</div>
+    <div class="page-sub">Selecione o profissional, o dia e o horário.</div>
+
+    <div class="steps">
+      <div class="step active" data-step="1"><span class="num">1</span> Profissional</div>
+      <div class="step" data-step="2"><span class="num">2</span> Dia</div>
+      <div class="step" data-step="3"><span class="num">3</span> Horário</div>
+      <div class="step" data-step="4"><span class="num">4</span> Confirmar</div>
+    </div>
+
+    <!-- passo 1: psicólogo -->
+    <div class="card" id="cardPsi">
+      <h2><span class="idx">01</span> Profissional</h2>
+      <div id="psiList" class="loading">Carregando profissionais…</div>
+    </div>
+
+    <!-- passo 2: dia -->
+    <div class="card hidden" id="cardData">
+      <h2><span class="idx">02</span> Dia da consulta</h2>
+      <div class="date-row">
+        <div class="field">
+          <label for="dataInput">Data</label>
+          <input id="dataInput" type="date">
+        </div>
+        <button id="btnVerHorarios" class="btn btn-primary" style="width:auto">Ver horários</button>
+      </div>
+    </div>
+
+    <!-- passo 3: horários -->
+    <div class="card hidden" id="cardSlots">
+      <h2><span class="idx">03</span> Horário disponível</h2>
+      <div id="slotList"></div>
+    </div>
+
+    <!-- passo 4: confirmar -->
+    <div class="card hidden" id="cardConfirm">
+      <h2><span class="idx">04</span> Dados do paciente</h2>
+      <div class="summary" id="summary"></div>
+      <div class="confirm-grid">
+        <div class="field full">
+          <label for="cliNome">Nome do paciente</label>
+          <input id="cliNome" type="text" placeholder="Nome completo">
+        </div>
+        <div class="field">
+          <label for="cliTel">Telefone</label>
+          <input id="cliTel" type="tel" placeholder="(61) 90000-0000">
+        </div>
+        <div class="field">
+          <label for="cliEmail">E-mail</label>
+          <input id="cliEmail" type="email" placeholder="opcional">
+        </div>
+        <div class="field full">
+          <label for="cliObs">Observações</label>
+          <textarea id="cliObs" rows="2" placeholder="opcional"></textarea>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="btnCancelar" class="btn btn-ghost">Recomeçar</button>
+        <button id="btnConfirmar" class="btn btn-confirm">Confirmar e marcar</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+// ===================== CONFIG =====================
+const SUPABASE_URL = 'https://toayvpcoxighrcnvqrwj.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvYXl2cGNveGlnaHJjbnZxcndqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NTI0MTcsImV4cCI6MjEwMDAyODQxN30.aE9YEIuBMnBdc-JSiFDe9OwFBttGWfc51CbwMbzVKHE';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ===================== ESTADO =====================
+const state = { psicologo:null, data:null, hora:null, duracao:50 };
+
+// ===================== HELPERS =====================
+const $ = s => document.querySelector(s);
+function toast(msg, isErr=false){
+  const t=$('#toast'); t.textContent=msg;
+  t.className='toast show'+(isErr?' err':'');
+  setTimeout(()=>t.className='toast',2600);
+}
+function setStep(n){
+  document.querySelectorAll('.step').forEach(s=>{
+    const k=+s.dataset.step;
+    s.classList.toggle('active',k===n);
+    s.classList.toggle('done',k<n);
+  });
+}
+const DIAS=['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+function fmtData(iso){
+  const [y,m,d]=iso.split('-').map(Number);
+  const dt=new Date(y,m-1,d);
+  return `${DIAS[dt.getDay()]}, ${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')}/${y}`;
+}
+
+// ===================== AUTH =====================
+async function checkSession(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session){ await enterApp(); }
+}
+async function enterApp(){
+  // confirma que é recepção
+  const { data:perfil, error } = await sb
+    .from('perfis').select('nome,papel').eq('id', (await sb.auth.getUser()).data.user.id).single();
+  if(error || !perfil){ toast('Perfil não encontrado. Fale com o administrador.',true); await sb.auth.signOut(); return; }
+  if(perfil.papel!=='recepcao'){
+    toast('Este acesso é da recepção.',true); await sb.auth.signOut(); return;
+  }
+  $('#userLabel').textContent = perfil.nome || 'Recepção';
+  $('#loginScreen').classList.add('hidden');
+  $('#app').classList.remove('hidden');
+  loadPsicologos();
+}
+
+$('#btnLogin').addEventListener('click', async ()=>{
+  const email=$('#email').value.trim(), senha=$('#senha').value;
+  const btn=$('#btnLogin'); $('#loginErr').textContent='';
+  if(!email||!senha){ $('#loginErr').textContent='Preencha e-mail e senha.'; return; }
+  btn.disabled=true; btn.textContent='Entrando…';
+  const { error } = await sb.auth.signInWithPassword({ email, password:senha });
+  btn.disabled=false; btn.textContent='Entrar';
+  if(error){ $('#loginErr').textContent='E-mail ou senha inválidos.'; return; }
+  await enterApp();
+});
+$('#senha').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#btnLogin').click(); });
+
+$('#btnLogout').addEventListener('click', async ()=>{
+  await sb.auth.signOut(); location.reload();
+});
+
+// ===================== PASSO 1: PSICÓLOGOS =====================
+async function loadPsicologos(){
+  const { data, error } = await sb
+    .from('psicologos').select('id,nome,especialidade').eq('ativo',true).order('nome');
+  const box=$('#psiList');
+  if(error){ box.innerHTML='<div class="empty">Não foi possível carregar os profissionais.</div>'; return; }
+  if(!data.length){ box.innerHTML='<div class="empty">Nenhum profissional cadastrado.</div>'; return; }
+  box.className='psi-grid';
+  box.innerHTML = data.map(p=>`
+    <button class="psi" data-id="${p.id}" data-nome="${p.nome}">
+      <div class="nome">${p.nome}</div>
+      <div class="esp">${p.especialidade||'—'}</div>
+    </button>`).join('');
+  box.querySelectorAll('.psi').forEach(el=>{
+    el.addEventListener('click',()=>{
+      box.querySelectorAll('.psi').forEach(x=>x.classList.remove('sel'));
+      el.classList.add('sel');
+      state.psicologo={ id:el.dataset.id, nome:el.dataset.nome };
+      // revela passo 2
+      $('#cardData').classList.remove('hidden');
+      setStep(2);
+      // default: próxima data
+      if(!$('#dataInput').value){
+        const t=new Date(); t.setDate(t.getDate()+1);
+        $('#dataInput').value=t.toISOString().slice(0,10);
+      }
+      $('#dataInput').focus();
+      // reseta passos seguintes
+      resetFrom(3);
+    });
+  });
+}
+
+// ===================== PASSO 2 → 3: HORÁRIOS =====================
+$('#btnVerHorarios').addEventListener('click', loadHorarios);
+$('#dataInput').addEventListener('change', ()=>resetFrom(3));
+
+async function loadHorarios(){
+  const data=$('#dataInput').value;
+  if(!data){ toast('Escolha uma data.',true); return; }
+  if(!state.psicologo){ toast('Escolha um profissional.',true); return; }
+  state.data=data;
+  $('#cardSlots').classList.remove('hidden');
+  setStep(3);
+  const box=$('#slotList'); box.className='loading'; box.textContent='Buscando horários…';
+
+  const { data:slots, error } = await sb.rpc('horarios_disponiveis',{
+    p_psicologo_id: state.psicologo.id, p_data: data
+  });
+  if(error){ box.className='empty'; box.textContent='Erro ao buscar horários: '+error.message; return; }
+  if(!slots.length){
+    box.className='empty';
+    box.textContent='Nenhum horário disponível neste dia para este profissional.';
+    return;
+  }
+  box.className='slots';
+  box.innerHTML = slots.map(s=>{
+    const hhmm=s.hora.slice(0,5);
+    return `<button class="slot" data-hora="${s.hora}" data-dur="${s.duracao_min}">${hhmm}</button>`;
+  }).join('');
+  box.querySelectorAll('.slot').forEach(el=>{
+    el.addEventListener('click',()=>{
+      box.querySelectorAll('.slot').forEach(x=>x.classList.remove('sel'));
+      el.classList.add('sel');
+      state.hora=el.dataset.hora; state.duracao=+el.dataset.dur;
+      showConfirm();
+    });
+  });
+}
+
+// ===================== PASSO 4: CONFIRMAR =====================
+function showConfirm(){
+  $('#cardConfirm').classList.remove('hidden');
+  setStep(4);
+  $('#summary').innerHTML=`
+    <div class="line"><span class="k">Profissional</span><b>${state.psicologo.nome}</b></div>
+    <div class="line"><span class="k">Data</span><b>${fmtData(state.data)}</b></div>
+    <div class="line"><span class="k">Horário</span><b>${state.hora.slice(0,5)} · ${state.duracao} min</b></div>`;
+  $('#cardConfirm').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+$('#btnConfirmar').addEventListener('click', async ()=>{
+  const nome=$('#cliNome').value.trim();
+  if(!nome){ toast('Informe o nome do paciente.',true); $('#cliNome').focus(); return; }
+  const btn=$('#btnConfirmar'); btn.disabled=true; btn.textContent='Marcando…';
+
+  const { data:novoId, error } = await sb.rpc('criar_agendamento',{
+    p_psicologo_id: state.psicologo.id,
+    p_data: state.data,
+    p_hora: state.hora,
+    p_duracao_min: state.duracao,
+    p_cliente_nome: nome,
+    p_cliente_email: $('#cliEmail').value.trim() || null,
+    p_cliente_telefone: $('#cliTel').value.trim() || null,
+    p_observacoes: $('#cliObs').value.trim() || null
+  });
+
+  if(error){
+    btn.disabled=false; btn.textContent='Confirmar e marcar';
+    toast(error.message.includes('já foi marcado')
+      ? 'Este horário acabou de ser ocupado. Escolha outro.'
+      : 'Erro ao marcar: '+error.message, true);
+    if(error.message.includes('já foi marcado')) loadHorarios();
+    return;
+  }
+
+  // TODO: aqui vamos chamar a Edge Function do Google Calendar (mockado por enquanto)
+  await marcarNoGoogleMock(novoId);
+
+  btn.disabled=false; btn.textContent='Confirmar e marcar';
+  toast('Consulta marcada com sucesso.');
+  resetAll();
+});
+
+$('#btnCancelar').addEventListener('click', resetAll);
+
+// mock da marcação no Google — será substituído por Edge Function real
+async function marcarNoGoogleMock(agendamentoId){
+  console.log('[MOCK] criaria evento no Google Calendar para agendamento', agendamentoId);
+  return new Promise(r=>setTimeout(r,300));
+}
+
+// ===================== RESET =====================
+function resetFrom(step){
+  if(step<=3){ $('#cardSlots').classList.add('hidden'); state.hora=null; }
+  if(step<=4){ $('#cardConfirm').classList.add('hidden'); }
+}
+function resetAll(){
+  state.psicologo=null; state.data=null; state.hora=null;
+  document.querySelectorAll('.psi').forEach(x=>x.classList.remove('sel'));
+  $('#cardData').classList.add('hidden');
+  $('#cardSlots').classList.add('hidden');
+  $('#cardConfirm').classList.add('hidden');
+  $('#cliNome').value=''; $('#cliTel').value=''; $('#cliEmail').value=''; $('#cliObs').value='';
+  setStep(1);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ===================== INIT =====================
+checkSession();
+</script>
+</body>
+</html>
