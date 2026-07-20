@@ -185,6 +185,7 @@
       <button class="tab active" data-tab="agenda">Liberar agenda</button>
       <button class="tab" data-tab="consultas">Minhas consultas</button>
       <button class="tab" data-tab="feedback">Registros de sessão <span id="fbBadge" class="badge hidden">0</span></button>
+      <button class="tab" data-tab="historico">Histórico</button>
     </div>
 
     <!-- ======= LIBERAR AGENDA ======= -->
@@ -240,6 +241,14 @@
         <div id="fbList" class="loading">Carregando…</div>
       </div>
     </div>
+    <!-- ======= HISTÓRICO ======= -->
+    <div class="panel" id="panel-historico">
+      <div class="card">
+        <h2>Histórico de sessões registradas</h2>
+        <p class="hint">Suas evoluções clínicas. Visível apenas para você.</p>
+        <div id="histList" class="loading">Carregando…</div>
+      </div>
+    </div>
   </main>
 </div>
 
@@ -249,7 +258,9 @@
 // ===== CONFIG =====
 const SUPABASE_URL='https://toayvpcoxighrcnvqrwj.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvYXl2cGNveGlnaHJjbnZxcndqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NTI0MTcsImV4cCI6MjEwMDAyODQxN30.aE9YEIuBMnBdc-JSiFDe9OwFBttGWfc51CbwMbzVKHE';
-const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON,{
+  auth:{ storageKey:'sb-agenda-psicologo' }  // sessão isolada da recepção
+});
 
 const $=s=>document.querySelector(s);
 const $$=s=>document.querySelectorAll(s);
@@ -304,6 +315,7 @@ $$('.tab').forEach(t=>t.addEventListener('click',()=>{
   $('#panel-'+t.dataset.tab).classList.add('active');
   if(t.dataset.tab==='consultas')loadConsultas();
   if(t.dataset.tab==='feedback')loadFeedback();
+  if(t.dataset.tab==='historico')loadHistorico();
 }));
 
 // ===== GRADE =====
@@ -490,6 +502,37 @@ async function salvarEvolucao(item){
   toast('Registro salvo.');
   item.remove(); loadFeedbackCount();
   if(!$('#fbList').children.length){$('#fbList').className='empty';$('#fbList').textContent='Nenhuma sessão aguardando registro. 🌿';}
+}
+
+// ===== HISTÓRICO DE EVOLUÇÕES =====
+async function loadHistorico(){
+  const box=$('#histList');box.className='loading';box.textContent='Carregando…';
+  const{data:evos,error}=await sb.from('sessoes_evolucao')
+    .select('id,agendamento_id,compareceu,evolucao,criado_em')
+    .eq('psicologo_id',state.psicologoId)
+    .order('criado_em',{ascending:false});
+  if(error){box.className='empty';box.textContent='Erro: '+error.message;return;}
+  if(!evos.length){box.className='empty';box.textContent='Nenhum registro ainda.';return;}
+  // busca dados dos agendamentos para mostrar paciente/data
+  const ids=evos.map(e=>e.agendamento_id);
+  const{data:ags}=await sb.from('agendamentos')
+    .select('id,data,hora,cliente_nome').in('id',ids);
+  const mapAg={};(ags||[]).forEach(a=>mapAg[a.id]=a);
+  box.className='';
+  box.innerHTML=evos.map(e=>{
+    const a=mapAg[e.agendamento_id]||{};
+    const d=a.data?new Date(a.data+'T00:00:00'):null;
+    const quando=d?`${DOW[d.getDay()]} ${d.getDate()}/${pad(d.getMonth()+1)}/${d.getFullYear()} · ${hhmm(a.hora)}`:'—';
+    return `<div class="fb-item">
+      <div class="fb-head">
+        <span class="pac">${a.cliente_nome||'Paciente'}</span>
+        <span class="meta">${quando}</span>
+      </div>
+      <span class="tag ${e.compareceu?'confirmado':'realizada'}" style="margin-bottom:8px">
+        ${e.compareceu?'Compareceu':'Faltou'}</span>
+      <div class="obs" style="margin-top:6px;white-space:pre-wrap">${e.evolucao?e.evolucao:'<em style="opacity:.5">Sem anotações</em>'}</div>
+    </div>`;
+  }).join('');
 }
 
 checkSession();

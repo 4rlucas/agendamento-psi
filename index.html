@@ -166,6 +166,24 @@
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .toast.err{background:var(--danger)}
 
+  /* abas recepção */
+  .rtabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:24px}
+  .rtab{background:none;border:none;font-family:inherit;font-size:14px;font-weight:500;
+    color:var(--ink-soft);padding:11px 16px;cursor:pointer;border-bottom:2px solid transparent;
+    margin-bottom:-1px;transition:color .15s,border-color .15s}
+  .rtab:hover{color:var(--ink)}
+  .rtab.active{color:var(--sage);border-color:var(--sage)}
+  .rpanel{display:none}
+  .rpanel.active{display:block}
+  .cmp-filter{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+  .cmp-row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line)}
+  .cmp-row:last-child{border-bottom:none}
+  .cmp-row .when{min-width:130px;font-size:13px;color:var(--ink-soft)}
+  .cmp-row .nome{flex:1;font-weight:500}
+  .cmp-row .st{font-size:12px;font-weight:600;padding:3px 11px;border-radius:8px}
+  .st.ok{background:var(--sage-tint);color:var(--sage-deep)}
+  .st.no{background:var(--danger-tint,#f4e0de);color:var(--danger)}
+
   @media (max-width:560px){
     .confirm-grid{grid-template-columns:1fr}
   }
@@ -206,6 +224,12 @@
   </header>
 
   <main class="wrap">
+    <div class="rtabs">
+      <button class="rtab active" data-rtab="marcar">Marcar consulta</button>
+      <button class="rtab" data-rtab="comparec">Comparecimento</button>
+    </div>
+
+    <div class="rpanel active" id="rpanel-marcar">
     <div class="page-title">Marcar consulta</div>
     <div class="page-sub">Selecione o profissional, o dia e o horário.</div>
 
@@ -267,6 +291,28 @@
         <button id="btnConfirmar" class="btn btn-confirm">Confirmar e marcar</button>
       </div>
     </div>
+    </div><!-- /rpanel-marcar -->
+
+    <div class="rpanel" id="rpanel-comparec">
+      <div class="page-title">Comparecimento</div>
+      <div class="page-sub">Registros de presença das sessões já realizadas.</div>
+      <div class="card">
+        <div class="cmp-filter">
+          <div class="field" style="margin-bottom:0">
+            <label for="cmpPsi">Profissional</label>
+            <select id="cmpPsi"><option value="">Todos</option></select>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label for="cmpIni">De</label><input id="cmpIni" type="date">
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label for="cmpFim">Até</label><input id="cmpFim" type="date">
+          </div>
+          <button id="btnCmpBuscar" class="btn btn-primary" style="width:auto">Buscar</button>
+        </div>
+        <div id="cmpList" class="empty" style="margin-top:16px">Escolha o período e clique em Buscar.</div>
+      </div>
+    </div><!-- /rpanel-comparec -->
   </main>
 </div>
 
@@ -276,7 +322,9 @@
 // ===================== CONFIG =====================
 const SUPABASE_URL = 'https://toayvpcoxighrcnvqrwj.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvYXl2cGNveGlnaHJjbnZxcndqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NTI0MTcsImV4cCI6MjEwMDAyODQxN30.aE9YEIuBMnBdc-JSiFDe9OwFBttGWfc51CbwMbzVKHE';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  auth:{ storageKey:'sb-agenda-recepcao' }  // sessão isolada do painel do psicólogo
+});
 
 // ===================== ESTADO =====================
 const state = { psicologo:null, data:null, hora:null, duracao:50 };
@@ -308,10 +356,31 @@ async function checkSession(){
   if(session){ await enterApp(); }
 }
 async function enterApp(){
-  // confirma que é recepção
-  const { data:perfil, error } = await sb
-    .from('perfis').select('nome,papel').eq('id', (await sb.auth.getUser()).data.user.id).single();
-  if(error || !perfil){ toast('Perfil não encontrado. Fale com o administrador.',true); await sb.auth.signOut(); return; }
+  // pega o usuário logado
+  const { data:userData, error:userErr } = await sb.auth.getUser();
+  if(userErr || !userData?.user){
+    console.error('getUser falhou:', userErr);
+    toast('Sessão inválida. Faça login novamente.',true);
+    await sb.auth.signOut(); return;
+  }
+  const uid = userData.user.id;
+  console.log('UID logado:', uid);
+
+  // confirma que é recepção — sem .single() pra ver o erro cru
+  const { data:perfis, error } = await sb
+    .from('perfis').select('nome,papel').eq('id', uid);
+  console.log('Resposta perfis:', { perfis, error });
+
+  if(error){
+    toast('Erro ao ler perfil: '+error.message, true);
+    console.error('Erro RLS/perfil:', error);
+    await sb.auth.signOut(); return;
+  }
+  if(!perfis || perfis.length===0){
+    toast('Perfil não encontrado para este usuário (UID no console).',true);
+    await sb.auth.signOut(); return;
+  }
+  const perfil = perfis[0];
   if(perfil.papel!=='recepcao'){
     toast('Este acesso é da recepção.',true); await sb.auth.signOut(); return;
   }
@@ -476,6 +545,47 @@ function resetAll(){
 }
 
 // ===================== INIT =====================
+// ===================== ABAS + COMPARECIMENTO =====================
+document.querySelectorAll('.rtab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.rtab').forEach(x=>x.classList.remove('active'));t.classList.add('active');
+  document.querySelectorAll('.rpanel').forEach(p=>p.classList.remove('active'));
+  document.querySelector('#rpanel-'+t.dataset.rtab).classList.add('active');
+  if(t.dataset.rtab==='comparec') initComparec();
+}));
+
+let cmpInit=false;
+async function initComparec(){
+  // default: últimos 30 dias
+  if(!$('#cmpIni').value){
+    const hoje=new Date(), ini=new Date(); ini.setDate(ini.getDate()-30);
+    $('#cmpIni').value=ini.toISOString().slice(0,10);
+    $('#cmpFim').value=hoje.toISOString().slice(0,10);
+  }
+  if(cmpInit) return; cmpInit=true;
+  // popula o select de psicólogos
+  const{data}=await sb.from('psicologos').select('id,nome').eq('ativo',true).order('nome');
+  const sel=$('#cmpPsi');
+  (data||[]).forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.nome;sel.appendChild(o);});
+}
+$('#btnCmpBuscar').addEventListener('click', async ()=>{
+  const ini=$('#cmpIni').value, fim=$('#cmpFim').value, psi=$('#cmpPsi').value||null;
+  if(!ini||!fim){ toast('Escolha o período.',true); return; }
+  const box=$('#cmpList'); box.className='empty'; box.textContent='Buscando…';
+  const{data,error}=await sb.rpc('status_comparecimento',{p_inicio:ini,p_fim:fim,p_psicologo_id:psi});
+  if(error){ box.className='empty'; box.textContent='Erro: '+error.message; return; }
+  if(!data.length){ box.className='empty'; box.textContent='Nenhum registro de comparecimento no período.'; return; }
+  const DIAS2=['dom','seg','ter','qua','qui','sex','sáb'];
+  box.className='';
+  box.innerHTML=data.map(r=>{
+    const [y,m,d]=r.data.split('-').map(Number); const dt=new Date(y,m-1,d);
+    return `<div class="cmp-row">
+      <div class="when">${DIAS2[dt.getDay()]} ${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')} · ${r.hora.slice(0,5)}</div>
+      <div class="nome">${r.cliente_nome}</div>
+      <span class="st ${r.compareceu?'ok':'no'}">${r.compareceu?'Compareceu':'Faltou'}</span>
+    </div>`;
+  }).join('');
+});
+
 checkSession();
 </script>
 </body>
