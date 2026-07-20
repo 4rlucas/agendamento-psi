@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agenda · Profissional</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#f3f5f2; --surface:#ffffff; --ink:#1c2723; --ink-soft:#5a6b64;
+    --line:#dde4df; --sage:#3f6b5a; --sage-deep:#2c4d40; --sage-tint:#e8efeb;
+    --amber:#c98a3a; --amber-tint:#f5ead9; --danger:#b4453a; --danger-tint:#f4e0de;
+    --radius:14px; --shadow:0 1px 2px rgba(28,39,35,.04), 0 8px 24px rgba(28,39,35,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);
+    line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+
+  header{background:var(--sage-deep);color:#eef3f0;padding:18px 0;position:sticky;top:0;z-index:20}
+  header .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:600}
+  .brand .dot{width:11px;height:11px;border-radius:50%;background:var(--amber);
+    box-shadow:0 0 0 4px rgba(201,138,58,.25)}
+  .brand small{display:block;font-weight:400;font-size:12px;opacity:.7}
+  .who{display:flex;align-items:center;gap:14px;font-size:13px}
+  .who button{background:rgba(255,255,255,.1);color:#eef3f0;border:1px solid rgba(255,255,255,.18);
+    padding:7px 13px;border-radius:9px;font-size:13px;cursor:pointer;font-family:inherit}
+  .who button:hover{background:rgba(255,255,255,.18)}
+
+  .login-screen{min-height:100vh;display:grid;place-items:center;padding:24px}
+  .login-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:36px 34px;width:100%;max-width:400px}
+  .login-card h1{font-family:'Fraunces',serif;font-weight:500;font-size:27px;margin-bottom:6px}
+  .login-card p.sub{color:var(--ink-soft);font-size:14px;margin-bottom:26px}
+  label{display:block;font-size:13px;font-weight:500;margin-bottom:6px}
+  input,select,textarea{width:100%;font-family:inherit;font-size:15px;color:var(--ink);
+    background:#fbfcfb;border:1px solid var(--line);border-radius:10px;padding:11px 13px;
+    transition:border-color .15s,box-shadow .15s}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--sage);
+    box-shadow:0 0 0 3px var(--sage-tint)}
+  .field{margin-bottom:16px}
+  .btn{font-family:inherit;font-size:15px;font-weight:500;cursor:pointer;border:none;
+    border-radius:10px;padding:12px 18px;transition:background .15s,opacity .15s}
+  .btn-primary{background:var(--sage);color:#fff}
+  .btn-primary:hover{background:var(--sage-deep)}
+  .btn-primary:disabled{opacity:.55;cursor:not-allowed}
+  .btn-ghost{background:transparent;color:var(--ink-soft);border:1px solid var(--line)}
+  .btn-ghost:hover{background:var(--bg)}
+  .err{color:var(--danger);font-size:13px;margin-top:12px;min-height:18px}
+
+  main{padding:26px 0 80px}
+  .greeting{font-family:'Fraunces',serif;font-weight:500;font-size:25px;margin-bottom:2px}
+  .greeting-sub{color:var(--ink-soft);font-size:14px;margin-bottom:22px}
+
+  /* tabs */
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:24px}
+  .tab{background:none;border:none;font-family:inherit;font-size:14px;font-weight:500;
+    color:var(--ink-soft);padding:11px 16px;cursor:pointer;border-bottom:2px solid transparent;
+    margin-bottom:-1px;transition:color .15s,border-color .15s}
+  .tab:hover{color:var(--ink)}
+  .tab.active{color:var(--sage);border-color:var(--sage)}
+  .tab .badge{display:inline-block;background:var(--amber);color:#fff;font-size:11px;
+    border-radius:9px;padding:1px 7px;margin-left:6px;font-weight:600}
+
+  .panel{display:none}
+  .panel.active{display:block}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:22px;margin-bottom:18px}
+  .card h2{font-size:15px;font-weight:600;margin-bottom:4px}
+  .card .hint{font-size:13px;color:var(--ink-soft);margin-bottom:16px}
+
+  /* config grade */
+  .grade-row{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
+  .grade-row .field{margin-bottom:0;flex:0 0 auto;width:130px}
+
+  /* calendário semanal */
+  .week-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px}
+  .week-nav .label{font-weight:600;font-size:15px}
+  .week-nav button{background:var(--surface);border:1px solid var(--line);border-radius:9px;
+    width:38px;height:38px;cursor:pointer;font-size:17px;color:var(--ink);transition:background .15s}
+  .week-nav button:hover{background:var(--sage-tint)}
+
+  .cal{overflow-x:auto}
+  .cal-grid{display:grid;grid-template-columns:56px repeat(7,minmax(88px,1fr));gap:5px;min-width:720px}
+  .cal-head{position:sticky;top:0}
+  .day-head{text-align:center;padding:8px 4px;border-radius:9px;background:var(--sage-tint)}
+  .day-head .dow{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--sage-deep);font-weight:600}
+  .day-head .dnum{font-size:18px;font-weight:600;color:var(--ink);font-family:'Fraunces',serif}
+  .day-head.today{background:var(--amber-tint)}
+  .day-head.today .dow{color:var(--amber)}
+  .time-label{font-size:12px;color:var(--ink-soft);display:flex;align-items:center;justify-content:flex-end;
+    padding-right:6px;height:38px}
+  .cell{height:38px;border-radius:8px;border:1.5px solid var(--line);background:#fbfcfb;cursor:pointer;
+    transition:background .12s,border-color .12s;font-size:12px;display:flex;align-items:center;
+    justify-content:center;color:transparent;user-select:none}
+  .cell:hover{border-color:var(--sage)}
+  .cell.free{background:var(--sage-tint);border-color:var(--sage);color:var(--sage-deep);font-weight:600}
+  .cell.free::after{content:'✓'}
+  .cell.busy{background:var(--amber-tint);border-color:var(--amber);color:var(--amber);
+    font-weight:600;cursor:not-allowed}
+  .cell.busy::after{content:'●'}
+  .cal-legend{display:flex;gap:18px;margin-top:14px;font-size:12px;color:var(--ink-soft);flex-wrap:wrap}
+  .cal-legend .k{display:inline-flex;align-items:center;gap:6px}
+  .cal-legend .sw{width:14px;height:14px;border-radius:4px;border:1.5px solid}
+  .sw.free{background:var(--sage-tint);border-color:var(--sage)}
+  .sw.busy{background:var(--amber-tint);border-color:var(--amber)}
+  .sw.empty{background:#fbfcfb;border-color:var(--line)}
+  .cal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+
+  /* consultas */
+  .appt{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
+  .appt:last-child{border-bottom:none}
+  .appt .when{flex:0 0 auto;text-align:center;min-width:64px}
+  .appt .when .d{font-size:12px;color:var(--ink-soft);text-transform:uppercase}
+  .appt .when .h{font-size:18px;font-weight:600;font-family:'Fraunces',serif}
+  .appt .body{flex:1}
+  .appt .pac{font-weight:600;font-size:15px}
+  .appt .obs{font-size:13px;color:var(--ink-soft);margin-top:3px}
+  .appt .tel{font-size:12px;color:var(--ink-soft);margin-top:2px}
+  .appt .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:8px;margin-top:6px}
+  .tag.confirmado{background:var(--sage-tint);color:var(--sage-deep)}
+  .tag.realizada{background:#e6ebe9;color:var(--ink-soft)}
+
+  /* feedback */
+  .fb-item{padding:16px 0;border-bottom:1px solid var(--line)}
+  .fb-item:last-child{border-bottom:none}
+  .fb-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px}
+  .fb-head .pac{font-weight:600}
+  .fb-head .meta{font-size:13px;color:var(--ink-soft)}
+  .fb-controls{display:flex;gap:8px;margin-bottom:10px}
+  .chip{border:1.5px solid var(--line);background:#fbfcfb;border-radius:9px;padding:7px 14px;
+    font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;color:var(--ink);transition:all .12s}
+  .chip.sel-ok{background:var(--sage-tint);border-color:var(--sage);color:var(--sage-deep)}
+  .chip.sel-no{background:var(--danger-tint);border-color:var(--danger);color:var(--danger)}
+  .fb-item textarea{margin-bottom:10px}
+  .fb-save{display:flex;justify-content:flex-end}
+  .btn-sm{font-size:13px;padding:8px 14px}
+
+  .empty{color:var(--ink-soft);font-size:14px;padding:14px 0}
+  .loading{color:var(--ink-soft);font-size:14px;padding:10px 0}
+  .hidden{display:none!important}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--sage-deep);color:#fff;padding:13px 22px;border-radius:11px;font-size:14px;
+    box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;
+    z-index:50;max-width:90vw}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.err{background:var(--danger)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <h1>Agenda</h1>
+    <p class="sub">Acesso do profissional</p>
+    <div class="field"><label for="email">E-mail</label>
+      <input id="email" type="email" autocomplete="username" placeholder="voce@clinica.com"></div>
+    <div class="field"><label for="senha">Senha</label>
+      <input id="senha" type="password" autocomplete="current-password" placeholder="••••••••"></div>
+    <button id="btnLogin" class="btn btn-primary" style="width:100%">Entrar</button>
+    <div id="loginErr" class="err"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <header><div class="wrap">
+    <div class="brand"><span class="dot"></span>
+      <div>Agenda<small id="userLabel">Profissional</small></div></div>
+    <div class="who"><button id="btnLogout">Sair</button></div>
+  </div></header>
+
+  <main class="wrap">
+    <div class="greeting" id="greeting">Olá</div>
+    <div class="greeting-sub">Gerencie sua agenda, consultas e registros de sessão.</div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="agenda">Liberar agenda</button>
+      <button class="tab" data-tab="consultas">Minhas consultas</button>
+      <button class="tab" data-tab="feedback">Registros de sessão <span id="fbBadge" class="badge hidden">0</span></button>
+    </div>
+
+    <!-- ======= LIBERAR AGENDA ======= -->
+    <div class="panel active" id="panel-agenda">
+      <div class="card" id="cardGrade">
+        <h2>Minha grade de atendimento</h2>
+        <p class="hint">Defina sua faixa de horário e a duração das sessões. O calendário abaixo usa essa configuração.</p>
+        <div class="grade-row">
+          <div class="field"><label>Início</label><input id="gInicio" type="time" value="08:00"></div>
+          <div class="field"><label>Fim</label><input id="gFim" type="time" value="18:00"></div>
+          <div class="field"><label>Duração (min)</label><input id="gDur" type="number" min="10" step="5" value="50"></div>
+          <button id="btnSalvarGrade" class="btn btn-primary">Salvar grade</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="week-nav">
+          <button id="prevWeek" title="Semana anterior">‹</button>
+          <div class="label" id="weekLabel">—</div>
+          <button id="nextWeek" title="Próxima semana">›</button>
+        </div>
+        <div class="cal">
+          <div id="calGrid" class="cal-grid"></div>
+        </div>
+        <div class="cal-legend">
+          <span class="k"><span class="sw empty"></span> Fechado (clique para liberar)</span>
+          <span class="k"><span class="sw free"></span> Liberado</span>
+          <span class="k"><span class="sw busy"></span> Consulta marcada</span>
+        </div>
+        <div class="cal-actions">
+          <button id="btnSalvarSemana" class="btn btn-primary">Salvar horários da semana</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= CONSULTAS ======= -->
+    <div class="panel" id="panel-consultas">
+      <div class="card">
+        <div class="week-nav">
+          <button id="prevWeekC" title="Semana anterior">‹</button>
+          <div class="label" id="weekLabelC">—</div>
+          <button id="nextWeekC" title="Próxima semana">›</button>
+        </div>
+        <div id="apptList" class="loading">Carregando…</div>
+      </div>
+    </div>
+
+    <!-- ======= FEEDBACK ======= -->
+    <div class="panel" id="panel-feedback">
+      <div class="card">
+        <h2>Sessões aguardando registro</h2>
+        <p class="hint">Consultas que já passaram e ainda não têm evolução registrada.</p>
+        <div id="fbList" class="loading">Carregando…</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+// ===== CONFIG =====
+const SUPABASE_URL='https://toayvpcoxighrcnvqrwj.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvYXl2cGNveGlnaHJjbnZxcndqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NTI0MTcsImV4cCI6MjEwMDAyODQxN30.aE9YEIuBMnBdc-JSiFDe9OwFBttGWfc51CbwMbzVKHE';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+
+const $=s=>document.querySelector(s);
+const $$=s=>document.querySelectorAll(s);
+const DOW=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+let state={ psicologoId:null, nome:null, grade:{inicio:'08:00',fim:'18:00',dur:50},
+  weekStart:null, weekStartC:null, cellSel:new Set(), slotsExist:new Map() };
+
+function toast(m,e=false){const t=$('#toast');t.textContent=m;t.className='toast show'+(e?' err':'');setTimeout(()=>t.className='toast',2800);}
+function pad(n){return String(n).padStart(2,'0');}
+function isoDate(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function mondayOf(d){const x=new Date(d);const dow=(x.getDay()+6)%7;x.setDate(x.getDate()-dow);x.setHours(0,0,0,0);return x;}
+function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
+function hhmm(t){return t.slice(0,5);}
+
+// ===== AUTH =====
+async function checkSession(){const{data:{session}}=await sb.auth.getSession();if(session)await enterApp();}
+async function enterApp(){
+  const{data:ud,error:ue}=await sb.auth.getUser();
+  if(ue||!ud?.user){toast('Sessão inválida.',true);await sb.auth.signOut();return;}
+  const{data:perfis,error}=await sb.from('perfis').select('nome,papel,psicologo_id').eq('id',ud.user.id);
+  if(error){toast('Erro ao ler perfil: '+error.message,true);await sb.auth.signOut();return;}
+  if(!perfis||!perfis.length){toast('Perfil não encontrado.',true);await sb.auth.signOut();return;}
+  const p=perfis[0];
+  if(p.papel!=='psicologo'||!p.psicologo_id){toast('Este acesso é do profissional.',true);await sb.auth.signOut();return;}
+  state.psicologoId=p.psicologo_id; state.nome=p.nome||'Profissional';
+  $('#userLabel').textContent=state.nome;
+  $('#greeting').textContent='Olá, '+state.nome.split(' ')[0];
+  $('#loginScreen').classList.add('hidden'); $('#app').classList.remove('hidden');
+  await loadGrade();
+  state.weekStart=mondayOf(new Date()); state.weekStartC=mondayOf(new Date());
+  await renderWeek(); 
+  loadFeedbackCount();
+}
+$('#btnLogin').addEventListener('click',async()=>{
+  const email=$('#email').value.trim(),senha=$('#senha').value;$('#loginErr').textContent='';
+  if(!email||!senha){$('#loginErr').textContent='Preencha e-mail e senha.';return;}
+  const b=$('#btnLogin');b.disabled=true;b.textContent='Entrando…';
+  const{error}=await sb.auth.signInWithPassword({email,password:senha});
+  b.disabled=false;b.textContent='Entrar';
+  if(error){$('#loginErr').textContent='E-mail ou senha inválidos.';return;}
+  await enterApp();
+});
+$('#senha').addEventListener('keydown',e=>{if(e.key==='Enter')$('#btnLogin').click();});
+$('#btnLogout').addEventListener('click',async()=>{await sb.auth.signOut();location.reload();});
+
+// ===== TABS =====
+$$('.tab').forEach(t=>t.addEventListener('click',()=>{
+  $$('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');
+  $$('.panel').forEach(p=>p.classList.remove('active'));
+  $('#panel-'+t.dataset.tab).classList.add('active');
+  if(t.dataset.tab==='consultas')loadConsultas();
+  if(t.dataset.tab==='feedback')loadFeedback();
+}));
+
+// ===== GRADE =====
+async function loadGrade(){
+  const{data}=await sb.from('grade_config').select('*').eq('psicologo_id',state.psicologoId).maybeSingle();
+  if(data){
+    state.grade={inicio:hhmm(data.hora_inicio),fim:hhmm(data.hora_fim),dur:data.duracao_min};
+    $('#gInicio').value=state.grade.inicio;$('#gFim').value=state.grade.fim;$('#gDur').value=state.grade.dur;
+  }
+}
+$('#btnSalvarGrade').addEventListener('click',async()=>{
+  const inicio=$('#gInicio').value,fim=$('#gFim').value,dur=+$('#gDur').value;
+  if(!inicio||!fim||fim<=inicio){toast('Faixa de horário inválida.',true);return;}
+  if(dur<10){toast('Duração muito curta.',true);return;}
+  const{error}=await sb.from('grade_config').upsert({
+    psicologo_id:state.psicologoId,hora_inicio:inicio,hora_fim:fim,duracao_min:dur,atualizado_em:new Date().toISOString()
+  });
+  if(error){toast('Erro ao salvar grade: '+error.message,true);return;}
+  state.grade={inicio,fim,dur};toast('Grade salva.');await renderWeek();
+});
+
+// gera horários da grade (array de "HH:MM")
+function gradeSlots(){
+  const [hi,mi]=state.grade.inicio.split(':').map(Number);
+  const [hf,mf]=state.grade.fim.split(':').map(Number);
+  const startMin=hi*60+mi, endMin=hf*60+mf, dur=state.grade.dur;
+  const out=[];
+  for(let m=startMin;m+dur<=endMin;m+=dur){out.push(pad(Math.floor(m/60))+':'+pad(m%60));}
+  return out;
+}
+
+// ===== CALENDÁRIO (liberar agenda) =====
+async function renderWeek(){
+  const start=state.weekStart, end=addDays(start,6);
+  $('#weekLabel').textContent=`${start.getDate()} ${MES[start.getMonth()]} – ${end.getDate()} ${MES[end.getMonth()]}`;
+  const grid=$('#calGrid'); const times=gradeSlots(); const todayIso=isoDate(new Date());
+
+  // carrega slots já liberados/ocupados da semana
+  state.slotsExist.clear(); state.cellSel.clear();
+  const{data:slots,error}=await sb.rpc('meus_slots',{p_inicio:isoDate(start),p_fim:isoDate(end)});
+  if(error){toast('Erro ao carregar semana: '+error.message,true);}
+  (slots||[]).forEach(s=>{state.slotsExist.set(isoDate(new Date(s.data+'T00:00:00'))+'|'+hhmm(s.hora),s.ocupado);});
+
+  // header
+  let html='<div></div>';
+  for(let i=0;i<7;i++){const d=addDays(start,i);const iso=isoDate(d);
+    html+=`<div class="day-head ${iso===todayIso?'today':''}"><div class="dow">${DOW[d.getDay()]}</div><div class="dnum">${d.getDate()}</div></div>`;}
+  // linhas
+  times.forEach(t=>{
+    html+=`<div class="time-label">${t}</div>`;
+    for(let i=0;i<7;i++){const d=addDays(start,i);const iso=isoDate(d);const key=iso+'|'+t;
+      const exist=state.slotsExist.has(key);const busy=exist&&state.slotsExist.get(key);
+      let cls='cell';if(busy)cls+=' busy';else if(exist){cls+=' free';state.cellSel.add(key);}
+      html+=`<div class="${cls}" data-key="${key}" data-busy="${busy?1:0}"></div>`;}
+  });
+  grid.innerHTML=html;
+  grid.querySelectorAll('.cell').forEach(c=>{
+    c.addEventListener('click',()=>{
+      if(c.dataset.busy==='1'){toast('Há consulta marcada neste horário.',true);return;}
+      const key=c.dataset.key;
+      if(c.classList.contains('free')){c.classList.remove('free');state.cellSel.delete(key);}
+      else{c.classList.add('free');state.cellSel.add(key);}
+    });
+  });
+}
+$('#prevWeek').addEventListener('click',()=>{state.weekStart=addDays(state.weekStart,-7);renderWeek();});
+$('#nextWeek').addEventListener('click',()=>{state.weekStart=addDays(state.weekStart,7);renderWeek();});
+
+$('#btnSalvarSemana').addEventListener('click',async()=>{
+  // diferença: adicionar novos (na seleção, sem existir) e remover os que existiam e foram tirados
+  const toAdd=[], toRemove=[];
+  const start=state.weekStart;
+  // percorre todos os slots possíveis da semana
+  const times=gradeSlots();
+  for(let i=0;i<7;i++){const iso=isoDate(addDays(start,i));
+    times.forEach(t=>{const key=iso+'|'+t;const existed=state.slotsExist.has(key)&&!state.slotsExist.get(key);
+      const selected=state.cellSel.has(key);
+      if(selected&&!existed)toAdd.push({data:iso,hora:t});
+      if(!selected&&existed)toRemove.push({data:iso,hora:t});
+    });}
+  const b=$('#btnSalvarSemana');b.disabled=true;b.textContent='Salvando…';
+  try{
+    if(toAdd.length){const{error}=await sb.rpc('liberar_slots',{p_slots:toAdd,p_duracao_min:state.grade.dur});if(error)throw error;}
+    for(const r of toRemove){const{error}=await sb.rpc('remover_slot',{p_data:r.data,p_hora:r.hora});if(error)throw error;}
+    toast(`Horários atualizados (${toAdd.length} liberados, ${toRemove.length} removidos).`);
+    await renderWeek();
+  }catch(e){toast('Erro ao salvar: '+e.message,true);}
+  b.disabled=false;b.textContent='Salvar horários da semana';
+});
+
+// ===== CONSULTAS =====
+$('#prevWeekC').addEventListener('click',()=>{state.weekStartC=addDays(state.weekStartC,-7);loadConsultas();});
+$('#nextWeekC').addEventListener('click',()=>{state.weekStartC=addDays(state.weekStartC,7);loadConsultas();});
+async function loadConsultas(){
+  const start=state.weekStartC,end=addDays(start,6);
+  $('#weekLabelC').textContent=`${start.getDate()} ${MES[start.getMonth()]} – ${end.getDate()} ${MES[end.getMonth()]}`;
+  const box=$('#apptList');box.className='loading';box.textContent='Carregando…';
+  const{data,error}=await sb.from('agendamentos')
+    .select('id,data,hora,cliente_nome,cliente_telefone,observacoes,status')
+    .eq('psicologo_id',state.psicologoId)
+    .gte('data',isoDate(start)).lte('data',isoDate(end))
+    .neq('status','cancelado')
+    .order('data').order('hora');
+  if(error){box.className='empty';box.textContent='Erro: '+error.message;return;}
+  if(!data.length){box.className='empty';box.textContent='Nenhuma consulta marcada nesta semana.';return;}
+  box.className='';
+  box.innerHTML=data.map(a=>{
+    const d=new Date(a.data+'T00:00:00');
+    return `<div class="appt">
+      <div class="when"><div class="d">${DOW[d.getDay()]} ${d.getDate()}/${pad(d.getMonth()+1)}</div>
+        <div class="h">${hhmm(a.hora)}</div></div>
+      <div class="body">
+        <div class="pac">${a.cliente_nome}</div>
+        ${a.cliente_telefone?`<div class="tel">${a.cliente_telefone}</div>`:''}
+        ${a.observacoes?`<div class="obs">${a.observacoes}</div>`:'<div class="obs" style="opacity:.5">Sem observações</div>'}
+        <span class="tag ${a.status}">${a.status==='realizada'?'Realizada':'Confirmada'}</span>
+      </div></div>`;
+  }).join('');
+}
+
+// ===== FEEDBACK / EVOLUÇÃO =====
+async function fetchPendentes(){
+  const hojeIso=isoDate(new Date());
+  // consultas confirmadas com data <= hoje, sem evolução registrada
+  const{data:ags,error}=await sb.from('agendamentos')
+    .select('id,data,hora,cliente_nome,status')
+    .eq('psicologo_id',state.psicologoId)
+    .lte('data',hojeIso)
+    .neq('status','cancelado')
+    .order('data',{ascending:false}).order('hora',{ascending:false});
+  if(error)return{err:error};
+  const ids=(ags||[]).map(a=>a.id);
+  let comEvo=new Set();
+  if(ids.length){
+    const{data:evos}=await sb.from('sessoes_evolucao').select('agendamento_id').in('agendamento_id',ids);
+    (evos||[]).forEach(e=>comEvo.add(e.agendamento_id));
+  }
+  return{pend:(ags||[]).filter(a=>!comEvo.has(a.id))};
+}
+async function loadFeedbackCount(){
+  const r=await fetchPendentes();if(r.err)return;
+  const n=r.pend.length;const b=$('#fbBadge');
+  if(n>0){b.textContent=n;b.classList.remove('hidden');}else b.classList.add('hidden');
+}
+async function loadFeedback(){
+  const box=$('#fbList');box.className='loading';box.textContent='Carregando…';
+  const r=await fetchPendentes();
+  if(r.err){box.className='empty';box.textContent='Erro: '+r.err.message;return;}
+  if(!r.pend.length){box.className='empty';box.textContent='Nenhuma sessão aguardando registro. 🌿';return;}
+  box.className='';
+  box.innerHTML=r.pend.map(a=>{
+    const d=new Date(a.data+'T00:00:00');
+    return `<div class="fb-item" data-id="${a.id}">
+      <div class="fb-head">
+        <span class="pac">${a.cliente_nome}</span>
+        <span class="meta">${DOW[d.getDay()]} ${d.getDate()}/${pad(d.getMonth()+1)} · ${hhmm(a.hora)}</span>
+      </div>
+      <div class="fb-controls">
+        <button class="chip chip-ok sel-ok" data-v="1">Compareceu</button>
+        <button class="chip chip-no" data-v="0">Faltou</button>
+      </div>
+      <textarea rows="3" placeholder="Evolução da sessão…"></textarea>
+      <div class="fb-save"><button class="btn btn-primary btn-sm">Salvar registro</button></div>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('.fb-item').forEach(item=>{
+    const ok=item.querySelector('.chip-ok'),no=item.querySelector('.chip-no');
+    ok.addEventListener('click',()=>{ok.classList.add('sel-ok');no.classList.remove('sel-no');});
+    no.addEventListener('click',()=>{no.classList.add('sel-no');ok.classList.remove('sel-ok');});
+    item.querySelector('.btn').addEventListener('click',()=>salvarEvolucao(item));
+  });
+}
+async function salvarEvolucao(item){
+  const id=item.dataset.id;
+  const compareceu=item.querySelector('.chip-ok').classList.contains('sel-ok');
+  const evo=item.querySelector('textarea').value.trim();
+  const b=item.querySelector('.btn');b.disabled=true;b.textContent='Salvando…';
+  const{error:e1}=await sb.from('sessoes_evolucao').insert({
+    agendamento_id:id,psicologo_id:state.psicologoId,compareceu,evolucao:evo||null
+  });
+  if(e1){b.disabled=false;b.textContent='Salvar registro';toast('Erro: '+e1.message,true);return;}
+  // marca o agendamento como realizado
+  await sb.from('agendamentos').update({status:'realizada'}).eq('id',id);
+  toast('Registro salvo.');
+  item.remove(); loadFeedbackCount();
+  if(!$('#fbList').children.length){$('#fbList').className='empty';$('#fbList').textContent='Nenhuma sessão aguardando registro. 🌿';}
+}
+
+checkSession();
+</script>
+</body>
+</html>
