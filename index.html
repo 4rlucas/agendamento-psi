@@ -512,20 +512,33 @@ $('#btnConfirmar').addEventListener('click', async ()=>{
     return;
   }
 
-  // TODO: aqui vamos chamar a Edge Function do Google Calendar (mockado por enquanto)
-  await marcarNoGoogleMock(novoId);
+  // Cria o evento no Google Calendar via Edge Function
+  const gcal = await marcarNoGoogle(novoId);
 
   btn.disabled=false; btn.textContent='Confirmar e marcar';
-  toast('Consulta marcada com sucesso.');
+  if(gcal.ok){
+    toast('Consulta marcada e adicionada ao Google Agenda.');
+  }else{
+    // agendamento gravou no banco, mas o Google falhou — avisa sem perder a consulta
+    toast('Consulta marcada, mas houve erro ao adicionar no Google Agenda.', true);
+    console.error('Falha Google Calendar:', gcal.error);
+  }
   resetAll();
 });
 
 $('#btnCancelar').addEventListener('click', resetAll);
 
-// mock da marcação no Google — será substituído por Edge Function real
-async function marcarNoGoogleMock(agendamentoId){
-  console.log('[MOCK] criaria evento no Google Calendar para agendamento', agendamentoId);
-  return new Promise(r=>setTimeout(r,300));
+// Chama a Edge Function para criar o evento no Google
+async function marcarNoGoogle(agendamentoId){
+  try{
+    const { data, error } = await sb.functions.invoke('google-calendar', {
+      body: { action:'criar', agendamento_id: agendamentoId }
+    });
+    if(error) return { ok:false, error:error.message };
+    return data; // { ok:true, event_id } ou { ok:false, error }
+  }catch(e){
+    return { ok:false, error:String(e) };
+  }
 }
 
 // ===================== RESET =====================
