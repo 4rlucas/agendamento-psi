@@ -184,6 +184,26 @@
   .st.ok{background:var(--sage-tint);color:var(--sage-deep)}
   .st.no{background:var(--danger-tint,#f4e0de);color:var(--danger)}
 
+  /* modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(28,39,35,.45);display:grid;place-items:center;
+    z-index:60;padding:20px}
+  .modal{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:26px;width:100%;max-width:420px}
+  .modal h3{font-family:'Fraunces',serif;font-weight:500;font-size:20px;margin-bottom:8px}
+  .modal-info{font-size:14px;color:var(--ink-soft);margin-bottom:16px}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
+
+  /* consultas agendadas */
+  .ag-row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line)}
+  .ag-row:last-child{border-bottom:none}
+  .ag-row .when{min-width:120px;font-size:13px;color:var(--ink-soft)}
+  .ag-row .info{flex:1}
+  .ag-row .info .nome{font-weight:500}
+  .ag-row .info .meta{font-size:12px;color:var(--ink-soft)}
+  .btn-cancel-sm{background:var(--danger-tint,#f4e0de);color:var(--danger);border:none;
+    border-radius:8px;padding:7px 13px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
+  .btn-cancel-sm:hover{background:var(--danger);color:#fff}
+
   @media (max-width:560px){
     .confirm-grid{grid-template-columns:1fr}
   }
@@ -227,6 +247,7 @@
     <div class="rtabs">
       <button class="rtab active" data-rtab="marcar">Marcar consulta</button>
       <button class="rtab" data-rtab="comparec">Comparecimento</button>
+      <button class="rtab" data-rtab="agendadas">Consultas agendadas</button>
     </div>
 
     <div class="rpanel active" id="rpanel-marcar">
@@ -313,7 +334,43 @@
         <div id="cmpList" class="empty" style="margin-top:16px">Escolha o período e clique em Buscar.</div>
       </div>
     </div><!-- /rpanel-comparec -->
+
+    <div class="rpanel" id="rpanel-agendadas">
+      <div class="page-title">Consultas agendadas</div>
+      <div class="page-sub">Consultas confirmadas. Cancele quando necessário.</div>
+      <div class="card">
+        <div class="cmp-filter">
+          <div class="field" style="margin-bottom:0">
+            <label for="agPsi">Profissional</label>
+            <select id="agPsi"><option value="">Todos</option></select>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label for="agIni">De</label><input id="agIni" type="date">
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label for="agFim">Até</label><input id="agFim" type="date">
+          </div>
+          <button id="btnAgBuscar" class="btn btn-primary" style="width:auto">Buscar</button>
+        </div>
+        <div id="agList" class="empty" style="margin-top:16px">Escolha o período e clique em Buscar.</div>
+      </div>
+    </div><!-- /rpanel-agendadas -->
   </main>
+</div>
+
+<div id="cancelModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Cancelar consulta</h3>
+    <p id="cancelInfo" class="modal-info"></p>
+    <div class="field">
+      <label for="cancelMotivo">Motivo do cancelamento</label>
+      <textarea id="cancelMotivo" rows="3" placeholder="Ex.: paciente solicitou remarcação"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button id="cancelVoltar" class="btn btn-ghost">Voltar</button>
+      <button id="cancelConfirmar" class="btn" style="background:var(--danger);color:#fff">Cancelar consulta</button>
+    </div>
+  </div>
 </div>
 
 <div id="toast" class="toast"></div>
@@ -564,6 +621,7 @@ document.querySelectorAll('.rtab').forEach(t=>t.addEventListener('click',()=>{
   document.querySelectorAll('.rpanel').forEach(p=>p.classList.remove('active'));
   document.querySelector('#rpanel-'+t.dataset.rtab).classList.add('active');
   if(t.dataset.rtab==='comparec') initComparec();
+  if(t.dataset.rtab==='agendadas') initAgendadas();
 }));
 
 let cmpInit=false;
@@ -597,6 +655,83 @@ $('#btnCmpBuscar').addEventListener('click', async ()=>{
       <span class="st ${r.compareceu?'ok':'no'}">${r.compareceu?'Compareceu':'Faltou'}</span>
     </div>`;
   }).join('');
+});
+
+// ===================== CONSULTAS AGENDADAS + CANCELAMENTO =====================
+let agInit=false, agToCancel=null;
+async function initAgendadas(){
+  if(!$('#agIni').value){
+    const hoje=new Date(), fim=new Date(); fim.setDate(fim.getDate()+30);
+    $('#agIni').value=hoje.toISOString().slice(0,10);
+    $('#agFim').value=fim.toISOString().slice(0,10);
+  }
+  if(agInit) return; agInit=true;
+  const{data}=await sb.from('psicologos').select('id,nome').eq('ativo',true).order('nome');
+  const sel=$('#agPsi');
+  (data||[]).forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.nome;sel.appendChild(o);});
+}
+$('#btnAgBuscar').addEventListener('click', loadAgendadas);
+async function loadAgendadas(){
+  const ini=$('#agIni').value, fim=$('#agFim').value, psi=$('#agPsi').value||null;
+  if(!ini||!fim){ toast('Escolha o período.',true); return; }
+  const box=$('#agList'); box.className='empty'; box.textContent='Buscando…';
+  const{data,error}=await sb.rpc('consultas_agendadas',{p_inicio:ini,p_fim:fim,p_psicologo_id:psi});
+  if(error){ box.className='empty'; box.textContent='Erro: '+error.message; return; }
+  if(!data.length){ box.className='empty'; box.textContent='Nenhuma consulta agendada no período.'; return; }
+  const DIAS2=['dom','seg','ter','qua','qui','sex','sáb'];
+  box.className='';
+  box.innerHTML=data.map(r=>{
+    const [y,m,d]=r.data.split('-').map(Number); const dt=new Date(y,m-1,d);
+    return `<div class="ag-row" data-id="${r.id}">
+      <div class="when">${DIAS2[dt.getDay()]} ${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')} · ${r.hora.slice(0,5)}</div>
+      <div class="info">
+        <div class="nome">${r.cliente_nome}</div>
+        <div class="meta">${r.psicologo_nome}${r.cliente_telefone?' · '+r.cliente_telefone:''}</div>
+      </div>
+      <button class="btn-cancel-sm" data-id="${r.id}"
+        data-info="${r.cliente_nome} · ${DIAS2[dt.getDay()]} ${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')} ${r.hora.slice(0,5)} · ${r.psicologo_nome}">Cancelar</button>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('.btn-cancel-sm').forEach(b=>{
+    b.addEventListener('click',()=>abrirModalCancel(b.dataset.id,b.dataset.info));
+  });
+}
+
+function abrirModalCancel(id,info){
+  agToCancel=id;
+  $('#cancelInfo').textContent=info;
+  $('#cancelMotivo').value='';
+  $('#cancelModal').classList.remove('hidden');
+}
+$('#cancelVoltar').addEventListener('click',()=>{$('#cancelModal').classList.add('hidden');agToCancel=null;});
+$('#cancelConfirmar').addEventListener('click', async ()=>{
+  if(!agToCancel) return;
+  const motivo=$('#cancelMotivo').value.trim();
+  if(!motivo){ toast('Informe o motivo do cancelamento.',true); return; }
+  const btn=$('#cancelConfirmar'); btn.disabled=true; btn.textContent='Cancelando…';
+
+  // 1) registra o motivo
+  const { error:e1 } = await sb.rpc('registrar_cancelamento',{
+    p_agendamento_id:agToCancel, p_motivo:motivo
+  });
+  // 2) remove do Google + marca status cancelado (Edge Function)
+  let gerr=null;
+  try{
+    const { data, error } = await sb.functions.invoke('google-calendar',{
+      body:{ action:'cancelar', agendamento_id:agToCancel }
+    });
+    if(error) gerr=error.message; else if(data && !data.ok) gerr=data.error;
+  }catch(e){ gerr=String(e); }
+
+  btn.disabled=false; btn.textContent='Cancelar consulta';
+  $('#cancelModal').classList.add('hidden');
+
+  if(e1){ toast('Erro ao registrar cancelamento: '+e1.message, true); }
+  else if(gerr){ toast('Consulta cancelada, mas houve erro ao remover do Google.', true); console.error(gerr); }
+  else { toast('Consulta cancelada e removida do Google Agenda.'); }
+
+  agToCancel=null;
+  loadAgendadas();
 });
 
 checkSession();
