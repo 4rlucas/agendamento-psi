@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Agenda · Profissional</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,11 +16,18 @@
     --radius:14px; --shadow:0 1px 2px rgba(28,39,35,.04), 0 8px 24px rgba(28,39,35,.06);
   }
   *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
   body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);
-    line-height:1.5;-webkit-font-smoothing:antialiased}
+    line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  button{touch-action:manipulation}
+  /* acessibilidade: foco visível por teclado */
+  a:focus-visible,button:focus-visible,input:focus-visible,
+  select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{
+    outline:2px solid var(--sage);outline-offset:2px}
   .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
 
-  header{background:var(--sage-deep);color:#eef3f0;padding:18px 0;position:sticky;top:0;z-index:20}
+  header{background:var(--sage-deep);color:#eef3f0;padding:18px 0;position:sticky;top:0;z-index:20;
+    padding-top:calc(18px + env(safe-area-inset-top,0px))}
   header .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px}
   .brand{display:flex;align-items:center;gap:11px;font-weight:600}
   .brand .dot{width:11px;height:11px;border-radius:50%;background:var(--amber);
@@ -141,7 +148,8 @@
   .fb-save{display:flex;justify-content:flex-end}
   .btn-sm{font-size:13px;padding:8px 14px}
 
-  .empty{color:var(--ink-soft);font-size:14px;padding:14px 0}
+  .empty{color:var(--ink-soft);font-size:14px;padding:22px 16px;text-align:center;
+    background:#fbfcfb;border:1px dashed var(--line);border-radius:10px}
   .loading{color:var(--ink-soft);font-size:14px;padding:10px 0}
   .hidden{display:none!important}
 
@@ -151,6 +159,53 @@
     z-index:50;max-width:90vw}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .toast.err{background:var(--danger)}
+
+  /* dica de rolagem do calendário (aparece no mobile) */
+  .cal-scroll-hint{display:none;font-size:12px;color:var(--ink-soft);margin-bottom:8px;
+    align-items:center;gap:6px}
+
+  /* ================= RESPONSIVO ================= */
+  @media (max-width:768px){
+    .wrap{padding:0 16px}
+    main{padding:18px 0 calc(60px + env(safe-area-inset-bottom,0px))}
+    .greeting{font-size:21px}
+    /* abas rolam horizontalmente */
+    .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;gap:2px}
+    .tab{white-space:nowrap;padding:12px 13px}
+    /* inputs 16px evitam auto-zoom do iOS */
+    input,select,textarea{font-size:16px;padding:12px 13px}
+    .btn{padding:13px 18px;font-size:16px}
+    /* grade de config empilha */
+    .grade-row{flex-direction:column;align-items:stretch;gap:12px}
+    .grade-row .field{width:100%}
+    .grade-row .btn{width:100%}
+    /* calendário: coluna de horário fixa + dias largos com snap pro toque */
+    .cal{-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;
+      position:relative;border:1px solid var(--line);border-radius:12px;padding:6px}
+    .cal-grid{grid-template-columns:48px repeat(7,minmax(104px,1fr));min-width:800px}
+    /* coluna de horários gruda na esquerda ao rolar */
+    .time-label,.cal-grid > .day-head:first-child{position:sticky;left:0;z-index:3;
+      background:var(--surface)}
+    .cal-grid > div:nth-child(8n+1){scroll-snap-align:start}
+    .cell{height:48px}
+    .day-head{scroll-snap-align:start}
+    .day-head .dnum{font-size:17px}
+    .cal-scroll-hint{display:flex}
+    .cal-actions .btn{width:100%}
+    /* consultas e feedback */
+    .appt{flex-wrap:wrap;gap:8px 14px}
+    .fb-controls{flex-wrap:wrap}
+    .week-nav .label{font-size:14px}
+  }
+  @media (max-width:480px){
+    .card{padding:18px}
+    .cal-grid{grid-template-columns:46px repeat(7,minmax(96px,1fr));min-width:740px}
+    .time-label{font-size:11px}
+  }
+  /* respeita quem prefere menos movimento (acessibilidade) */
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.01ms!important;transition-duration:.01ms!important}
+  }
 </style>
 </head>
 <body>
@@ -207,6 +262,7 @@
           <div class="label" id="weekLabel">—</div>
           <button id="nextWeek" title="Próxima semana">›</button>
         </div>
+        <div class="cal-scroll-hint">← arraste para ver todos os dias da semana →</div>
         <div class="cal">
           <div id="calGrid" class="cal-grid"></div>
         </div>
