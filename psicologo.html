@@ -252,6 +252,7 @@
           <div class="field"><label>Início</label><input id="gInicio" type="time" value="08:00"></div>
           <div class="field"><label>Fim</label><input id="gFim" type="time" value="18:00"></div>
           <div class="field"><label>Duração (min)</label><input id="gDur" type="number" min="10" step="5" value="50"></div>
+          <div class="field"><label>Intervalo (min)</label><input id="gInt" type="number" min="0" step="5" value="0"></div>
           <button id="btnSalvarGrade" class="btn btn-primary">Salvar grade</button>
         </div>
       </div>
@@ -323,7 +324,7 @@ const $$=s=>document.querySelectorAll(s);
 const DOW=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 
-let state={ psicologoId:null, nome:null, grade:{inicio:'08:00',fim:'18:00',dur:50},
+let state={ psicologoId:null, nome:null, grade:{inicio:'08:00',fim:'18:00',dur:50,intervalo:0},
   weekStart:null, weekStartC:null, cellSel:new Set(), slotsExist:new Map() };
 
 function toast(m,e=false){const t=$('#toast');t.textContent=m;t.className='toast show'+(e?' err':'');setTimeout(()=>t.className='toast',2800);}
@@ -378,28 +379,33 @@ $$('.tab').forEach(t=>t.addEventListener('click',()=>{
 async function loadGrade(){
   const{data}=await sb.from('grade_config').select('*').eq('psicologo_id',state.psicologoId).maybeSingle();
   if(data){
-    state.grade={inicio:hhmm(data.hora_inicio),fim:hhmm(data.hora_fim),dur:data.duracao_min};
-    $('#gInicio').value=state.grade.inicio;$('#gFim').value=state.grade.fim;$('#gDur').value=state.grade.dur;
+    state.grade={inicio:hhmm(data.hora_inicio),fim:hhmm(data.hora_fim),dur:data.duracao_min,
+      intervalo:data.intervalo_min||0};
+    $('#gInicio').value=state.grade.inicio;$('#gFim').value=state.grade.fim;
+    $('#gDur').value=state.grade.dur;$('#gInt').value=state.grade.intervalo;
   }
 }
 $('#btnSalvarGrade').addEventListener('click',async()=>{
-  const inicio=$('#gInicio').value,fim=$('#gFim').value,dur=+$('#gDur').value;
+  const inicio=$('#gInicio').value,fim=$('#gFim').value,dur=+$('#gDur').value,intervalo=+$('#gInt').value;
   if(!inicio||!fim||fim<=inicio){toast('Faixa de horário inválida.',true);return;}
   if(dur<10){toast('Duração muito curta.',true);return;}
+  if(intervalo<0){toast('Intervalo inválido.',true);return;}
   const{error}=await sb.from('grade_config').upsert({
-    psicologo_id:state.psicologoId,hora_inicio:inicio,hora_fim:fim,duracao_min:dur,atualizado_em:new Date().toISOString()
+    psicologo_id:state.psicologoId,hora_inicio:inicio,hora_fim:fim,duracao_min:dur,
+    intervalo_min:intervalo,atualizado_em:new Date().toISOString()
   });
   if(error){toast('Erro ao salvar grade: '+error.message,true);return;}
-  state.grade={inicio,fim,dur};toast('Grade salva.');await renderWeek();
+  state.grade={inicio,fim,dur,intervalo};toast('Grade salva.');await renderWeek();
 });
 
-// gera horários da grade (array de "HH:MM")
+// gera horários da grade (array de "HH:MM") — passo = duração + intervalo
 function gradeSlots(){
   const [hi,mi]=state.grade.inicio.split(':').map(Number);
   const [hf,mf]=state.grade.fim.split(':').map(Number);
   const startMin=hi*60+mi, endMin=hf*60+mf, dur=state.grade.dur;
+  const passo=dur+(state.grade.intervalo||0);
   const out=[];
-  for(let m=startMin;m+dur<=endMin;m+=dur){out.push(pad(Math.floor(m/60))+':'+pad(m%60));}
+  for(let m=startMin;m+dur<=endMin;m+=passo){out.push(pad(Math.floor(m/60))+':'+pad(m%60));}
   return out;
 }
 

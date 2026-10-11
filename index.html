@@ -154,6 +154,13 @@
   .summary .line{display:flex;gap:8px;margin-bottom:4px}
   .summary .line:last-child{margin-bottom:0}
   .summary .k{opacity:.7;min-width:78px}
+  .rec-check{display:flex;align-items:center;gap:9px;font-weight:500;cursor:pointer}
+  .rec-check input{width:auto}
+  .rec-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .rec-grid label{font-size:13px;font-weight:500;margin-bottom:6px;display:block}
+  .rec-preview{margin-top:12px;padding:12px 14px;background:var(--sage-tint);border-radius:10px;
+    font-size:13px;color:var(--sage-deep);max-height:160px;overflow-y:auto}
+  .rec-preview .conf{color:var(--danger);font-weight:600}
 
   .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
   .btn-ghost{background:transparent;color:var(--ink-soft);border:1px solid var(--line)}
@@ -347,6 +354,33 @@
         <div class="field full">
           <label for="cliObs">Observações</label>
           <textarea id="cliObs" rows="2" placeholder="opcional"></textarea>
+        </div>
+        <div class="field full">
+          <label class="rec-check">
+            <input id="recOn" type="checkbox"> Repetir este horário (sessão recorrente)
+          </label>
+        </div>
+        <div class="field full hidden" id="recOpts">
+          <div class="rec-grid">
+            <div>
+              <label for="recFreq">Frequência</label>
+              <select id="recFreq">
+                <option value="7">Toda semana</option>
+                <option value="14">A cada 15 dias</option>
+              </select>
+            </div>
+            <div>
+              <label for="recMeses">Durante</label>
+              <select id="recMeses">
+                <option value="1">1 mês</option>
+                <option value="2">2 meses</option>
+                <option value="3" selected>3 meses</option>
+                <option value="6">6 meses</option>
+                <option value="12">12 meses</option>
+              </select>
+            </div>
+          </div>
+          <div id="recPreview" class="rec-preview hidden"></div>
         </div>
       </div>
       <div class="actions">
@@ -623,20 +657,70 @@ function showConfirm(){
   $('#cardConfirm').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
+// ---- recorrência: toggle + preview ----
+let recDatas=[]; // datas livres previstas (as que serão criadas)
+$('#recOn').addEventListener('change', async ()=>{
+  const on=$('#recOn').checked;
+  $('#recOpts').classList.toggle('hidden', !on);
+  if(on) await previewRecorrencia(); else $('#recPreview').classList.add('hidden');
+});
+$('#recFreq').addEventListener('change', previewRecorrencia);
+$('#recMeses').addEventListener('change', previewRecorrencia);
+
+async function previewRecorrencia(){
+  if(!state.psicologo||!state.data||!state.hora) return;
+  const freq=+$('#recFreq').value, meses=+$('#recMeses').value;
+  const { data, error } = await sb.rpc('verificar_recorrencia',{
+    p_psicologo_id: state.psicologo.id, p_data_inicio: state.data,
+    p_hora: state.hora, p_meses: meses, p_frequencia: freq
+  });
+  const box=$('#recPreview'); box.classList.remove('hidden');
+  if(error){ box.innerHTML='Erro ao prever datas: '+error.message; recDatas=[]; return; }
+  recDatas = data.filter(d=>d.livre).map(d=>d.data);
+  const ocupadas = data.filter(d=>!d.livre);
+  const DIAS2=['dom','seg','ter','qua','qui','sex','sáb'];
+  const fmt=iso=>{const[y,m,dd]=iso.split('-').map(Number);const dt=new Date(y,m-1,dd);
+    return `${DIAS2[dt.getDay()]} ${String(dd).padStart(2,'0')}/${String(m).padStart(2,'0')}`;};
+  box.innerHTML = `<b>${recDatas.length} sessões</b> serão marcadas.`
+    + (ocupadas.length ? `<br><span class="conf">${ocupadas.length} data(s) já ocupada(s) e serão puladas:</span> `
+        + ocupadas.map(d=>fmt(d.data)).join(', ') : '');
+}
+
 $('#btnConfirmar').addEventListener('click', async ()=>{
   const nome=$('#cliNome').value.trim();
   if(!nome){ toast('Informe o nome do paciente.',true); $('#cliNome').focus(); return; }
   const btn=$('#btnConfirmar'); btn.disabled=true; btn.textContent='Marcando…';
 
-  const { data:novoId, error } = await sb.rpc('criar_agendamento',{
-    p_psicologo_id: state.psicologo.id,
-    p_data: state.data,
-    p_hora: state.hora,
-    p_duracao_min: state.duracao,
+  const comum={
     p_cliente_nome: nome,
     p_cliente_email: $('#cliEmail').value.trim() || null,
     p_cliente_telefone: $('#cliTel').value.trim() || null,
     p_observacoes: $('#cliObs').value.trim() || null
+  };
+
+  // ===== RECORRENTE =====
+  if($('#recOn').checked){
+    if(!recDatas.length){ btn.disabled=false; btn.textContent='Confirmar e marcar';
+      toast('Nenhuma data livre para marcar.',true); return; }
+    const { data, error } = await sb.rpc('criar_recorrencia',{
+      p_psicologo_id: state.psicologo.id,
+      p_datas: recDatas, p_hora: state.hora, p_duracao_min: state.duracao, ...comum
+    });
+    if(error){ btn.disabled=false; btn.textContent='Confirmar e marcar';
+      toast('Erro ao marcar recorrência: '+error.message,true); return; }
+    const criados = data?.[0]?.criados ?? 0;
+    // cria eventos no Google para cada agendamento da série
+    const gres = await marcarRecorrenciaNoGoogle(data?.[0]?.recorrencia_id);
+    btn.disabled=false; btn.textContent='Confirmar e marcar';
+    toast(`${criados} sessões marcadas${gres.erros?` (${gres.erros} sem evento no Google)`:' e adicionadas ao Google'}.`,
+      gres.erros>0);
+    resetAll(); return;
+  }
+
+  // ===== ÚNICA =====
+  const { data:novoId, error } = await sb.rpc('criar_agendamento',{
+    p_psicologo_id: state.psicologo.id,
+    p_data: state.data, p_hora: state.hora, p_duracao_min: state.duracao, ...comum
   });
 
   if(error){
@@ -648,19 +732,26 @@ $('#btnConfirmar').addEventListener('click', async ()=>{
     return;
   }
 
-  // Cria o evento no Google Calendar via Edge Function
   const gcal = await marcarNoGoogle(novoId);
-
   btn.disabled=false; btn.textContent='Confirmar e marcar';
-  if(gcal.ok){
-    toast('Consulta marcada e adicionada ao Google Agenda.');
-  }else{
-    // agendamento gravou no banco, mas o Google falhou — avisa sem perder a consulta
-    toast('Consulta marcada, mas houve erro ao adicionar no Google Agenda.', true);
-    console.error('Falha Google Calendar:', gcal.error);
-  }
+  if(gcal.ok){ toast('Consulta marcada e adicionada ao Google Agenda.'); }
+  else{ toast('Consulta marcada, mas houve erro ao adicionar no Google Agenda.', true);
+    console.error('Falha Google Calendar:', gcal.error); }
   resetAll();
 });
+
+// cria eventos no Google para todos os agendamentos de uma recorrência
+async function marcarRecorrenciaNoGoogle(recId){
+  if(!recId) return {erros:0};
+  const { data:ags } = await sb.from('agendamentos')
+    .select('id').eq('recorrencia_id',recId).eq('status','confirmado');
+  let erros=0;
+  for(const a of (ags||[])){
+    const r = await marcarNoGoogle(a.id);
+    if(!r.ok) erros++;
+  }
+  return {erros};
+}
 
 $('#btnCancelar').addEventListener('click', resetAll);
 
@@ -689,6 +780,8 @@ function resetAll(){
   $('#cardSlots').classList.add('hidden');
   $('#cardConfirm').classList.add('hidden');
   $('#cliNome').value=''; $('#cliTel').value=''; $('#cliEmail').value=''; $('#cliObs').value='';
+  $('#recOn').checked=false; $('#recOpts').classList.add('hidden');
+  $('#recPreview').classList.add('hidden'); recDatas=[];
   setStep(1);
   window.scrollTo({top:0,behavior:'smooth'});
 }
