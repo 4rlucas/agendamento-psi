@@ -219,6 +219,10 @@
   .btn-cancel-sm{background:var(--danger-tint,#f4e0de);color:var(--danger);border:none;
     border-radius:8px;padding:7px 13px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
   .btn-cancel-sm:hover{background:var(--danger);color:#fff}
+  .ag-acoes{display:flex;gap:8px;flex-wrap:wrap}
+  .btn-mover-sm{background:var(--sage-tint);color:var(--sage-deep);border:none;
+    border-radius:8px;padding:7px 13px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
+  .btn-mover-sm:hover{background:var(--sage);color:#fff}
 
   /* ================= RESPONSIVO ================= */
   @media (max-width:768px){
@@ -453,6 +457,11 @@
             <label for="uEsp">Especialidade</label>
             <input id="uEsp" type="text" placeholder="Ex.: TCC">
           </div>
+          <div class="field full" id="uAgendaField">
+            <label for="uAgenda">ID da agenda Google da psicóloga (opcional)</label>
+            <input id="uAgenda" type="text" placeholder="…@group.calendar.google.com">
+            <div class="hint-inline">Ela deve compartilhar a agenda com o robô. Pode preencher depois.</div>
+          </div>
           <div class="field">
             <label for="uEmail">E-mail de acesso</label>
             <input id="uEmail" type="email" placeholder="pessoa@clinica.com">
@@ -482,6 +491,22 @@
     <div class="modal-actions">
       <button id="cancelVoltar" class="btn btn-ghost">Voltar</button>
       <button id="cancelConfirmar" class="btn" style="background:var(--danger);color:#fff">Cancelar consulta</button>
+    </div>
+  </div>
+</div>
+
+<div id="moverModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Mudar horário</h3>
+    <p id="moverInfo" class="modal-info"></p>
+    <div class="field">
+      <label for="moverHora">Novo horário</label>
+      <input id="moverHora" type="time" step="300">
+    </div>
+    <div id="moverPreview" class="rec-preview hidden"></div>
+    <div class="modal-actions">
+      <button id="moverVoltar" class="btn btn-ghost">Voltar</button>
+      <button id="moverConfirmar" class="btn btn-primary">Aplicar mudança</button>
     </div>
   </div>
 </div>
@@ -861,10 +886,17 @@ async function loadAgendadas(){
         <div class="nome">${r.cliente_nome}</div>
         <div class="meta">${r.psicologo_nome}${r.cliente_telefone?' · '+r.cliente_telefone:''}</div>
       </div>
-      <button class="btn-cancel-sm" data-id="${r.id}"
-        data-info="${r.cliente_nome} · ${DIAS2[dt.getDay()]} ${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')} ${r.hora.slice(0,5)} · ${r.psicologo_nome}">Cancelar</button>
+      <div class="ag-acoes">
+        <button class="btn-mover-sm" data-id="${r.id}"
+          data-info="${r.cliente_nome} · ${DIAS2[dt.getDay()]} ${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')} ${r.hora.slice(0,5)}">Mudar horário</button>
+        <button class="btn-cancel-sm" data-id="${r.id}"
+          data-info="${r.cliente_nome} · ${DIAS2[dt.getDay()]} ${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')} ${r.hora.slice(0,5)} · ${r.psicologo_nome}">Cancelar</button>
+      </div>
     </div>`;
   }).join('');
+  box.querySelectorAll('.btn-mover-sm').forEach(b=>{
+    b.addEventListener('click',()=>abrirModalMover(b.dataset.id,b.dataset.info));
+  });
   box.querySelectorAll('.btn-cancel-sm').forEach(b=>{
     b.addEventListener('click',()=>abrirModalCancel(b.dataset.id,b.dataset.info));
   });
@@ -907,10 +939,76 @@ $('#cancelConfirmar').addEventListener('click', async ()=>{
   loadAgendadas();
 });
 
+// ===================== MUDAR HORÁRIO (cascata) =====================
+let agToMover=null, planoMover=[];
+function abrirModalMover(id,info){
+  agToMover=id; planoMover=[];
+  $('#moverInfo').textContent=info;
+  $('#moverHora').value='';
+  $('#moverPreview').classList.add('hidden'); $('#moverPreview').innerHTML='';
+  $('#moverModal').classList.remove('hidden');
+}
+$('#moverVoltar').addEventListener('click',()=>{$('#moverModal').classList.add('hidden');agToMover=null;});
+
+// ao escolher a nova hora, mostra o preview da cascata
+$('#moverHora').addEventListener('change', async ()=>{
+  const nova=$('#moverHora').value;
+  if(!nova||!agToMover){ return; }
+  const box=$('#moverPreview'); box.classList.remove('hidden'); box.innerHTML='Calculando…';
+  const { data, error } = await sb.rpc('simular_remanejo',{
+    p_agendamento_id:agToMover, p_nova_hora:nova
+  });
+  if(error){ box.innerHTML='Erro: '+error.message; planoMover=[]; return; }
+  planoMover = (data||[]).filter(p=>p.acao==='mover');
+  const fora = (data||[]).filter(p=>p.acao==='fora');
+  if(!data || !data.length){ box.innerHTML='Nada a mover.'; return; }
+  const linhas = (data||[]).map(p=>{
+    const h=p.hora_nova.slice(0,5), a=p.hora_antiga.slice(0,5);
+    if(p.acao==='fora') return `<span class="conf">⚠ ${p.cliente_nome}: ${a} → ficaria fora do expediente (não será movido)</span>`;
+    return `${p.cliente_nome}: ${a} → <b>${h}</b>`;
+  });
+  box.innerHTML = linhas.join('<br>') + (fora.length
+    ? `<br><span class="conf">${fora.length} sessão(ões) não cabem e você precisará remarcar manualmente.</span>` : '');
+});
+
+$('#moverConfirmar').addEventListener('click', async ()=>{
+  const nova=$('#moverHora').value;
+  if(!nova||!agToMover){ toast('Escolha o novo horário.',true); return; }
+  if(!planoMover.length){ toast('Nada a mover neste horário.',true); return; }
+  const btn=$('#moverConfirmar'); btn.disabled=true; btn.textContent='Aplicando…';
+
+  const { data, error } = await sb.rpc('aplicar_remanejo',{
+    p_agendamento_id:agToMover, p_nova_hora:nova
+  });
+  if(error){ btn.disabled=false; btn.textContent='Aplicar mudança';
+    toast('Erro ao remanejar: '+error.message,true); return; }
+
+  // atualiza os eventos no Google: recria cada agendamento movido
+  let gerros=0;
+  for(const mv of (data||[])){
+    // cancela o evento antigo e cria o novo (a Edge Function 'criar' usa a hora atual do banco)
+    try{
+      const r = await sb.functions.invoke('google-calendar',{
+        body:{ action:'recriar', agendamento_id: mv.agendamento_id }
+      });
+      if(r.error || (r.data && !r.data.ok)) gerros++;
+    }catch(e){ gerros++; }
+  }
+
+  btn.disabled=false; btn.textContent='Aplicar mudança';
+  $('#moverModal').classList.add('hidden'); agToMover=null; planoMover=[];
+  toast(`Horários remanejados${gerros?` (${gerros} evento(s) com erro no Google)`:' e atualizados no Google'}.`, gerros>0);
+  loadAgendadas();
+});
+
 // ===================== CRIAR USUÁRIOS (ADM) =====================
 function initUsuarios(){
   // mostra/esconde o campo especialidade conforme o papel
-  const toggle=()=>{ $('#uEspField').style.display = $('#uPapel').value==='psicologo'?'':'none'; };
+  const toggle=()=>{
+    const ehPsi = $('#uPapel').value==='psicologo';
+    $('#uEspField').style.display = ehPsi?'':'none';
+    $('#uAgendaField').style.display = ehPsi?'':'none';
+  };
   $('#uPapel').removeEventListener('change', toggle);
   $('#uPapel').addEventListener('change', toggle);
   toggle();
@@ -919,6 +1017,7 @@ $('#btnCriarUsuario').addEventListener('click', async ()=>{
   const nome=$('#uNome').value.trim();
   const papel=$('#uPapel').value;
   const esp=$('#uEsp').value.trim();
+  const agenda=$('#uAgenda').value.trim();
   const email=$('#uEmail').value.trim();
   const senha=$('#uSenha').value;
   const msg=$('#uMsg'); msg.style.color='var(--danger)'; msg.textContent='';
@@ -928,7 +1027,8 @@ $('#btnCriarUsuario').addEventListener('click', async ()=>{
 
   const btn=$('#btnCriarUsuario'); btn.disabled=true; btn.textContent='Criando…';
   const { data, error } = await sb.functions.invoke('criar-usuario', {
-    body: { nome, email, senha, papel, especialidade: esp||null }
+    body: { nome, email, senha, papel, especialidade: esp||null,
+            google_calendar_id: (papel==='psicologo' && agenda) ? agenda : null }
   });
   btn.disabled=false; btn.textContent='Criar usuário';
 
@@ -938,7 +1038,7 @@ $('#btnCriarUsuario').addEventListener('click', async ()=>{
   }
   msg.style.color='var(--sage)';
   msg.textContent = 'Usuário criado com sucesso.';
-  $('#uNome').value=''; $('#uEmail').value=''; $('#uSenha').value=''; $('#uEsp').value='';
+  $('#uNome').value=''; $('#uEmail').value=''; $('#uSenha').value=''; $('#uEsp').value=''; $('#uAgenda').value='';
   toast('Usuário criado com sucesso.');
 });
 
