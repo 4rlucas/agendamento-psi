@@ -164,6 +164,17 @@
   .cal-scroll-hint{display:none;font-size:12px;color:var(--ink-soft);margin-bottom:8px;
     align-items:center;gap:6px}
 
+  /* card de agenda google */
+  .agenda-passos{margin:0 0 16px 18px;font-size:13px;color:var(--ink-soft);line-height:1.7}
+  .agenda-passos b{color:var(--ink);font-weight:600;word-break:break-all}
+  .agenda-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+  .btn-copiar{background:var(--sage-tint);color:var(--sage-deep);border:none;border-radius:6px;
+    padding:2px 8px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;margin-left:4px}
+  .btn-copiar:hover{background:var(--sage);color:#fff}
+  .agenda-status{font-size:13px;margin-top:10px}
+  .agenda-status.ok{color:var(--sage)}
+  .agenda-status.err{color:var(--danger)}
+
   /* ações no rodapé da consulta */
   .appt-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
   .btn-mover-sm{background:var(--sage-tint);color:var(--sage-deep);border:none;border-radius:8px;
@@ -273,6 +284,7 @@
       <button class="tab" data-tab="consultas">Minhas consultas</button>
       <button class="tab" data-tab="feedback">Registros de sessão <span id="fbBadge" class="badge hidden">0</span></button>
       <button class="tab" data-tab="historico">Histórico</button>
+      <button class="tab" data-tab="config">Configurações</button>
     </div>
 
     <!-- ======= LIBERAR AGENDA ======= -->
@@ -336,6 +348,29 @@
         <h2>Histórico de sessões registradas</h2>
         <p class="hint">Suas evoluções clínicas. Visível apenas para você.</p>
         <div id="histList" class="loading">Carregando…</div>
+      </div>
+    </div>
+
+    <!-- ======= CONFIGURAÇÕES ======= -->
+    <div class="panel" id="panel-config">
+      <div class="card" id="cardAgenda">
+        <h2>Minha agenda do Google</h2>
+        <p class="hint">Conecte sua agenda para que as consultas marcadas apareçam automaticamente nela.</p>
+        <ol class="agenda-passos">
+          <li>No Google Agenda, abra as configurações da sua agenda → <b>Compartilhar com pessoas específicas</b>.</li>
+          <li>Adicione <b id="robotEmail">agendamentos@agendamento-psi-502915.iam.gserviceaccount.com</b>
+              <button id="btnCopiarRobo" class="btn-copiar" type="button">copiar</button>
+              com permissão <b>"Fazer alterações e ver todos os detalhes dos eventos"</b>.</li>
+          <li>Em <b>Integrar agenda</b>, copie o <b>ID da agenda</b> e cole abaixo.</li>
+        </ol>
+        <div class="agenda-row">
+          <div class="field" style="flex:1;margin-bottom:0">
+            <label for="agendaId">ID da agenda</label>
+            <input id="agendaId" type="text" placeholder="…@group.calendar.google.com">
+          </div>
+          <button id="btnSalvarAgenda" class="btn btn-primary">Salvar agenda</button>
+        </div>
+        <div id="agendaMsg" class="agenda-status"></div>
       </div>
     </div>
   </main>
@@ -443,6 +478,7 @@ $$('.tab').forEach(t=>t.addEventListener('click',()=>{
   if(t.dataset.tab==='consultas')loadConsultas();
   if(t.dataset.tab==='feedback')loadFeedback();
   if(t.dataset.tab==='historico')loadHistorico();
+  if(t.dataset.tab==='config')loadAgenda();
 }));
 
 // ===== GRADE =====
@@ -454,7 +490,36 @@ async function loadGrade(){
     $('#gInicio').value=state.grade.inicio;$('#gFim').value=state.grade.fim;
     $('#gDur').value=state.grade.dur;$('#gInt').value=state.grade.intervalo;
   }
+  await loadAgenda();
 }
+
+// ---- agenda Google da psicóloga ----
+async function loadAgenda(){
+  const{data}=await sb.from('psicologos').select('google_calendar_id').eq('id',state.psicologoId).maybeSingle();
+  const msg=$('#agendaMsg');
+  if(data && data.google_calendar_id){
+    $('#agendaId').value=data.google_calendar_id;
+    msg.className='agenda-status ok'; msg.textContent='✓ Agenda conectada.';
+  }else{
+    msg.className='agenda-status'; msg.textContent='Nenhuma agenda conectada ainda.';
+  }
+}
+$('#btnCopiarRobo').addEventListener('click',()=>{
+  const email=$('#robotEmail').textContent.trim();
+  navigator.clipboard.writeText(email).then(()=>toast('E-mail do robô copiado.'))
+    .catch(()=>toast('Copie manualmente: '+email,true));
+});
+$('#btnSalvarAgenda').addEventListener('click',async()=>{
+  const id=$('#agendaId').value.trim();
+  const msg=$('#agendaMsg');
+  const btn=$('#btnSalvarAgenda'); btn.disabled=true; btn.textContent='Salvando…';
+  const{error}=await sb.from('psicologos')
+    .update({google_calendar_id: id||null}).eq('id',state.psicologoId);
+  btn.disabled=false; btn.textContent='Salvar agenda';
+  if(error){ msg.className='agenda-status err'; msg.textContent='Erro ao salvar: '+error.message; return; }
+  if(id){ msg.className='agenda-status ok'; msg.textContent='✓ Agenda conectada.'; toast('Agenda conectada.'); }
+  else{ msg.className='agenda-status'; msg.textContent='Agenda removida.'; toast('Agenda removida.'); }
+});
 $('#btnSalvarGrade').addEventListener('click',async()=>{
   const inicio=$('#gInicio').value,fim=$('#gFim').value,dur=+$('#gDur').value,intervalo=+$('#gInt').value;
   if(!inicio||!fim||fim<=inicio){toast('Faixa de horário inválida.',true);return;}

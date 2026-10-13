@@ -475,11 +475,6 @@
             <label for="uEsp">Especialidade</label>
             <input id="uEsp" type="text" placeholder="Ex.: TCC">
           </div>
-          <div class="field full" id="uAgendaField">
-            <label for="uAgenda">ID da agenda Google da psicóloga (opcional)</label>
-            <input id="uAgenda" type="text" placeholder="…@group.calendar.google.com">
-            <div class="hint-inline">Ela deve compartilhar a agenda com o robô. Pode preencher depois.</div>
-          </div>
           <div class="field">
             <label for="uEmail">E-mail de acesso</label>
             <input id="uEmail" type="email" placeholder="pessoa@clinica.com">
@@ -1053,7 +1048,6 @@ function initUsuarios(){
   const toggle=()=>{
     const ehPsi = $('#uPapel').value==='psicologo';
     $('#uEspField').style.display = ehPsi?'':'none';
-    $('#uAgendaField').style.display = ehPsi?'':'none';
   };
   $('#uPapel').removeEventListener('change', toggle);
   $('#uPapel').addEventListener('change', toggle);
@@ -1063,7 +1057,6 @@ $('#btnCriarUsuario').addEventListener('click', async ()=>{
   const nome=$('#uNome').value.trim();
   const papel=$('#uPapel').value;
   const esp=$('#uEsp').value.trim();
-  const agenda=$('#uAgenda').value.trim();
   const email=$('#uEmail').value.trim();
   const senha=$('#uSenha').value;
   const msg=$('#uMsg'); msg.style.color='var(--danger)'; msg.textContent='';
@@ -1073,8 +1066,7 @@ $('#btnCriarUsuario').addEventListener('click', async ()=>{
 
   const btn=$('#btnCriarUsuario'); btn.disabled=true; btn.textContent='Criando…';
   const { data, error } = await sb.functions.invoke('criar-usuario', {
-    body: { nome, email, senha, papel, especialidade: esp||null,
-            google_calendar_id: (papel==='psicologo' && agenda) ? agenda : null }
+    body: { nome, email, senha, papel, especialidade: esp||null }
   });
   btn.disabled=false; btn.textContent='Criar usuário';
 
@@ -1084,7 +1076,7 @@ $('#btnCriarUsuario').addEventListener('click', async ()=>{
   }
   msg.style.color='var(--sage)';
   msg.textContent = 'Usuário criado com sucesso.';
-  $('#uNome').value=''; $('#uEmail').value=''; $('#uSenha').value=''; $('#uEsp').value=''; $('#uAgenda').value='';
+  $('#uNome').value=''; $('#uEmail').value=''; $('#uSenha').value=''; $('#uEsp').value='';
   toast('Usuário criado com sucesso.');
 });
 
