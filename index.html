@@ -281,6 +281,24 @@
   </div>
 </div>
 
+<!-- ===================== TROCA DE SENHA (1º login) ===================== -->
+<div id="trocaScreen" class="login-screen hidden">
+  <div class="login-card">
+    <h1>Bem-vindo(a)</h1>
+    <p class="sub">Por segurança, defina uma nova senha para continuar.</p>
+    <div class="field">
+      <label for="novaSenha">Nova senha</label>
+      <input id="novaSenha" type="password" autocomplete="new-password" placeholder="mínimo 6 caracteres">
+    </div>
+    <div class="field">
+      <label for="novaSenha2">Confirme a nova senha</label>
+      <input id="novaSenha2" type="password" autocomplete="new-password" placeholder="repita a senha">
+    </div>
+    <button id="btnTrocarSenha" class="btn btn-primary">Salvar e entrar</button>
+    <div id="trocaErr" class="err"></div>
+  </div>
+</div>
+
 <!-- ===================== APP ===================== -->
 <div id="app" class="hidden">
   <header>
@@ -563,7 +581,7 @@ async function enterApp(){
 
   // confirma que é recepção — sem .single() pra ver o erro cru
   const { data:perfis, error } = await sb
-    .from('perfis').select('nome,papel').eq('id', uid);
+    .from('perfis').select('nome,papel,senha_provisoria').eq('id', uid);
   console.log('Resposta perfis:', { perfis, error });
 
   if(error){
@@ -579,11 +597,39 @@ async function enterApp(){
   if(perfil.papel!=='recepcao'){
     toast('Este acesso é da recepção.',true); await sb.auth.signOut(); return;
   }
+  // 1º login: força troca de senha antes de entrar
+  if(perfil.senha_provisoria){
+    mostrarTrocaSenha();
+    return;
+  }
   $('#userLabel').textContent = perfil.nome || 'Admin';
   $('#loginScreen').classList.add('hidden');
   $('#app').classList.remove('hidden');
   loadPsicologos();
 }
+
+// ---- troca de senha obrigatória (1º login) ----
+function mostrarTrocaSenha(){
+  $('#loginScreen').classList.add('hidden');
+  $('#app').classList.add('hidden');
+  $('#trocaScreen').classList.remove('hidden');
+}
+$('#btnTrocarSenha').addEventListener('click', async ()=>{
+  const s1=$('#novaSenha').value, s2=$('#novaSenha2').value;
+  const err=$('#trocaErr'); err.textContent='';
+  if(!s1||s1.length<6){ err.textContent='A senha deve ter ao menos 6 caracteres.'; return; }
+  if(s1!==s2){ err.textContent='As senhas não coincidem.'; return; }
+  const btn=$('#btnTrocarSenha'); btn.disabled=true; btn.textContent='Salvando…';
+  // troca a senha do usuário logado (nativo do Supabase, sem e-mail)
+  const { error:e1 } = await sb.auth.updateUser({ password: s1 });
+  if(e1){ btn.disabled=false; btn.textContent='Salvar e entrar'; err.textContent='Erro: '+e1.message; return; }
+  // marca o perfil como não-provisório
+  const uid=(await sb.auth.getUser()).data.user.id;
+  await sb.from('perfis').update({ senha_provisoria:false }).eq('id', uid);
+  btn.disabled=false; btn.textContent='Salvar e entrar';
+  $('#trocaScreen').classList.add('hidden');
+  await enterApp(); // agora entra normal
+});
 
 $('#btnLogin').addEventListener('click', async ()=>{
   const email=$('#email').value.trim(), senha=$('#senha').value;

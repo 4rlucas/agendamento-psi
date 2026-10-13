@@ -164,6 +164,24 @@
   .cal-scroll-hint{display:none;font-size:12px;color:var(--ink-soft);margin-bottom:8px;
     align-items:center;gap:6px}
 
+  /* ações no rodapé da consulta */
+  .appt-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .btn-mover-sm{background:var(--sage-tint);color:var(--sage-deep);border:none;border-radius:8px;
+    padding:6px 12px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
+  .btn-mover-sm:hover{background:var(--sage);color:#fff}
+
+  /* modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(28,39,35,.45);display:grid;place-items:center;
+    z-index:60;padding:20px}
+  .modal{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:26px;width:100%;max-width:440px}
+  .modal h3{font-family:'Fraunces',serif;font-weight:500;font-size:20px;margin-bottom:8px}
+  .modal-info{font-size:14px;color:var(--ink-soft);margin-bottom:16px}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px}
+  .mover-preview{margin-top:12px;padding:12px 14px;background:var(--sage-tint);border-radius:10px;
+    font-size:13px;color:var(--sage-deep);max-height:180px;overflow-y:auto}
+  .mover-preview .conf{color:var(--danger);font-weight:600}
+
   /* ================= RESPONSIVO ================= */
   @media (max-width:768px){
     .wrap{padding:0 16px}
@@ -221,6 +239,20 @@
       <input id="senha" type="password" autocomplete="current-password" placeholder="••••••••"></div>
     <button id="btnLogin" class="btn btn-primary" style="width:100%">Entrar</button>
     <div id="loginErr" class="err"></div>
+  </div>
+</div>
+
+<!-- TROCA DE SENHA (1º login) -->
+<div id="trocaScreen" class="login-screen hidden">
+  <div class="login-card">
+    <h1>Bem-vindo(a)</h1>
+    <p class="sub">Por segurança, defina uma nova senha para continuar.</p>
+    <div class="field"><label for="novaSenha">Nova senha</label>
+      <input id="novaSenha" type="password" autocomplete="new-password" placeholder="mínimo 6 caracteres"></div>
+    <div class="field"><label for="novaSenha2">Confirme a nova senha</label>
+      <input id="novaSenha2" type="password" autocomplete="new-password" placeholder="repita a senha"></div>
+    <button id="btnTrocarSenha" class="btn btn-primary" style="width:100%">Salvar e entrar</button>
+    <div id="trocaErr" class="err"></div>
   </div>
 </div>
 
@@ -309,6 +341,22 @@
   </main>
 </div>
 
+<div id="moverModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Mudar horário</h3>
+    <p id="moverInfo" class="modal-info"></p>
+    <div class="field">
+      <label for="moverHora">Novo horário</label>
+      <input id="moverHora" type="time" step="300">
+    </div>
+    <div id="moverPreview" class="mover-preview hidden"></div>
+    <div class="modal-actions">
+      <button id="moverVoltar" class="btn btn-ghost">Voltar</button>
+      <button id="moverConfirmar" class="btn btn-primary">Aplicar mudança</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script>
@@ -339,11 +387,13 @@ async function checkSession(){const{data:{session}}=await sb.auth.getSession();i
 async function enterApp(){
   const{data:ud,error:ue}=await sb.auth.getUser();
   if(ue||!ud?.user){toast('Sessão inválida.',true);await sb.auth.signOut();return;}
-  const{data:perfis,error}=await sb.from('perfis').select('nome,papel,psicologo_id').eq('id',ud.user.id);
+  const{data:perfis,error}=await sb.from('perfis').select('nome,papel,psicologo_id,senha_provisoria').eq('id',ud.user.id);
   if(error){toast('Erro ao ler perfil: '+error.message,true);await sb.auth.signOut();return;}
   if(!perfis||!perfis.length){toast('Perfil não encontrado.',true);await sb.auth.signOut();return;}
   const p=perfis[0];
   if(p.papel!=='psicologo'||!p.psicologo_id){toast('Este acesso é do profissional.',true);await sb.auth.signOut();return;}
+  // 1º login: força troca de senha antes de entrar
+  if(p.senha_provisoria){ mostrarTrocaSenha(); return; }
   state.psicologoId=p.psicologo_id; state.nome=p.nome||'Profissional';
   $('#userLabel').textContent=state.nome;
   $('#greeting').textContent='Olá, '+state.nome.split(' ')[0];
@@ -353,6 +403,26 @@ async function enterApp(){
   await renderWeek(); 
   loadFeedbackCount();
 }
+function mostrarTrocaSenha(){
+  $('#loginScreen').classList.add('hidden');
+  $('#app').classList.add('hidden');
+  $('#trocaScreen').classList.remove('hidden');
+}
+$('#btnTrocarSenha').addEventListener('click', async ()=>{
+  const s1=$('#novaSenha').value, s2=$('#novaSenha2').value;
+  const err=$('#trocaErr'); err.textContent='';
+  if(!s1||s1.length<6){ err.textContent='A senha deve ter ao menos 6 caracteres.'; return; }
+  if(s1!==s2){ err.textContent='As senhas não coincidem.'; return; }
+  const btn=$('#btnTrocarSenha'); btn.disabled=true; btn.textContent='Salvando…';
+  const { error:e1 } = await sb.auth.updateUser({ password: s1 });
+  if(e1){ btn.disabled=false; btn.textContent='Salvar e entrar'; err.textContent='Erro: '+e1.message; return; }
+  const uid=(await sb.auth.getUser()).data.user.id;
+  await sb.from('perfis').update({ senha_provisoria:false }).eq('id', uid);
+  btn.disabled=false; btn.textContent='Salvar e entrar';
+  $('#trocaScreen').classList.add('hidden');
+  await enterApp();
+});
+
 $('#btnLogin').addEventListener('click',async()=>{
   const email=$('#email').value.trim(),senha=$('#senha').value;$('#loginErr').textContent='';
   if(!email||!senha){$('#loginErr').textContent='Preencha e-mail e senha.';return;}
@@ -493,9 +563,15 @@ async function loadConsultas(){
         <div class="pac">${a.cliente_nome}</div>
         ${a.cliente_telefone?`<div class="tel">${a.cliente_telefone}</div>`:''}
         ${a.observacoes?`<div class="obs">${a.observacoes}</div>`:'<div class="obs" style="opacity:.5">Sem observações</div>'}
-        <span class="tag ${a.status}">${a.status==='realizada'?'Realizada':'Confirmada'}</span>
+        <div class="appt-foot">
+          <span class="tag ${a.status}">${a.status==='realizada'?'Realizada':'Confirmada'}</span>
+          ${a.status==='confirmado'?`<button class="btn-mover-sm" data-id="${a.id}" data-info="${a.cliente_nome} · ${DOW[d.getDay()]} ${d.getDate()}/${pad(d.getMonth()+1)} ${hhmm(a.hora)}">Mudar horário</button>`:''}
+        </div>
       </div></div>`;
   }).join('');
+  box.querySelectorAll('.btn-mover-sm').forEach(b=>{
+    b.addEventListener('click',()=>abrirModalMover(b.dataset.id,b.dataset.info));
+  });
 }
 
 // ===== FEEDBACK / EVOLUÇÃO =====
@@ -596,6 +672,51 @@ async function loadHistorico(){
     </div>`;
   }).join('');
 }
+
+// ===== MUDAR HORÁRIO (cascata) =====
+let agToMover=null, planoMover=[];
+function abrirModalMover(id,info){
+  agToMover=id; planoMover=[];
+  $('#moverInfo').textContent=info;
+  $('#moverHora').value='';
+  $('#moverPreview').classList.add('hidden'); $('#moverPreview').innerHTML='';
+  $('#moverModal').classList.remove('hidden');
+}
+$('#moverVoltar').addEventListener('click',()=>{$('#moverModal').classList.add('hidden');agToMover=null;});
+$('#moverHora').addEventListener('change', async ()=>{
+  const nova=$('#moverHora').value;
+  if(!nova||!agToMover) return;
+  const box=$('#moverPreview'); box.classList.remove('hidden'); box.innerHTML='Calculando…';
+  const { data, error } = await sb.rpc('simular_remanejo',{p_agendamento_id:agToMover,p_nova_hora:nova});
+  if(error){ box.innerHTML='Erro: '+error.message; planoMover=[]; return; }
+  planoMover=(data||[]).filter(p=>p.acao==='mover');
+  const fora=(data||[]).filter(p=>p.acao==='fora');
+  if(!data||!data.length){ box.innerHTML='Nada a mover.'; return; }
+  box.innerHTML=(data||[]).map(p=>{
+    const h=p.hora_nova.slice(0,5),a=p.hora_antiga.slice(0,5);
+    return p.acao==='fora'
+      ? `<span class="conf">⚠ ${p.cliente_nome}: ${a} → ficaria fora do expediente (não será movido)</span>`
+      : `${p.cliente_nome}: ${a} → <b>${h}</b>`;
+  }).join('<br>') + (fora.length?`<br><span class="conf">${fora.length} sessão(ões) não cabem; remarque manualmente.</span>`:'');
+});
+$('#moverConfirmar').addEventListener('click', async ()=>{
+  const nova=$('#moverHora').value;
+  if(!nova||!agToMover){ toast('Escolha o novo horário.',true); return; }
+  if(!planoMover.length){ toast('Nada a mover neste horário.',true); return; }
+  const btn=$('#moverConfirmar'); btn.disabled=true; btn.textContent='Aplicando…';
+  const { data, error } = await sb.rpc('aplicar_remanejo',{p_agendamento_id:agToMover,p_nova_hora:nova});
+  if(error){ btn.disabled=false; btn.textContent='Aplicar mudança'; toast('Erro ao remanejar: '+error.message,true); return; }
+  let gerros=0;
+  for(const mv of (data||[])){
+    try{ const r=await sb.functions.invoke('google-calendar',{body:{action:'recriar',agendamento_id:mv.agendamento_id}});
+      if(r.error||(r.data&&!r.data.ok)) gerros++;
+    }catch(e){ gerros++; }
+  }
+  btn.disabled=false; btn.textContent='Aplicar mudança';
+  $('#moverModal').classList.add('hidden'); agToMover=null; planoMover=[];
+  toast(`Horários remanejados${gerros?` (${gerros} com erro no Google)`:' e atualizados no Google'}.`, gerros>0);
+  loadConsultas();
+});
 
 checkSession();
 </script>
