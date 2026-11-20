@@ -10,27 +10,38 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
-    --bg:#f3f5f2;
-    --surface:#ffffff;
-    --ink:#1c2723;
-    --ink-soft:#5a6b64;
-    --line:#dde4df;
-    --sage:#3f6b5a;      /* verde petróleo suave */
-    --sage-deep:#2c4d40;
-    --sage-tint:#e8efeb;
-    --amber:#c98a3a;     /* acento quente pontual */
+    --bg:#f5e4da;
+    --surface:rgba(255,250,247,.55);      /* vidro */
+    --surface-solid:#fbf3ee;              /* sólido quando precisa */
+    --ink:#44302a;
+    --ink-soft:#a07d72;
+    --line:rgba(255,255,255,.6);          /* borda de vidro */
+    --line-solid:#e7d4c8;
+    --sage:#c0533a;        /* acento principal = terracota (mantém o nome p/ não quebrar) */
+    --sage-deep:#9a4026;
+    --sage-tint:rgba(192,83,58,.14);
+    --amber:#d98a86;       /* rosa queimado */
     --danger:#b4453a;
-    --radius:14px;
-    --shadow:0 1px 2px rgba(28,39,35,.04), 0 8px 24px rgba(28,39,35,.06);
+    --radius:24px;
+    --radius-sm:16px;
+    --glass-brd:rgba(255,255,255,.6);
+    --shadow:0 10px 44px rgba(68,48,42,.1);
   }
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500;600&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%}
   body{
-    font-family:'Inter',system-ui,sans-serif;
+    font-family:'Jost','Inter',system-ui,sans-serif;font-weight:300;
     background:var(--bg);color:var(--ink);
-    line-height:1.5;-webkit-font-smoothing:antialiased;
-    overflow-x:hidden;
+    line-height:1.6;-webkit-font-smoothing:antialiased;
+    overflow-x:hidden;position:relative;min-height:100vh;
   }
+  /* blobs de fundo pro glass desfocar */
+  body::before,body::after{content:"";position:fixed;border-radius:50%;filter:blur(80px);z-index:0;opacity:.55;pointer-events:none}
+  body::before{width:460px;height:460px;background:#e8a08a;top:-120px;left:-90px}
+  body::after{width:440px;height:440px;background:#d98a86;bottom:-140px;right:-100px}
+  #app,#loginScreen,#trocaScreen,header,main,.modal-bg{position:relative;z-index:1}
+  h1,h2,h3,.page-title,.brand,.login-card h1{font-family:'Cormorant Garamond',serif}
   button{touch-action:manipulation}
   /* acessibilidade: foco visível por teclado */
   a:focus-visible,button:focus-visible,input:focus-visible,
@@ -40,59 +51,67 @@
 
   /* ---------- topbar ---------- */
   header{
-    background:var(--sage-deep);color:#eef3f0;
-    padding:18px 0;position:sticky;top:0;z-index:20;
-    padding-top:calc(18px + env(safe-area-inset-top,0px));
+    background:rgba(255,250,247,.5);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    color:var(--ink);border-bottom:1px solid var(--glass-brd);
+    padding:16px 0;position:sticky;top:0;z-index:20;
+    padding-top:calc(16px + env(safe-area-inset-top,0px));
   }
   header .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px}
-  .brand{display:flex;align-items:center;gap:11px;font-weight:600}
-  .brand .dot{width:11px;height:11px;border-radius:50%;
-    background:var(--amber);box-shadow:0 0 0 4px rgba(201,138,58,.25)}
-  .brand small{display:block;font-weight:400;font-size:12px;opacity:.7;letter-spacing:.02em}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:600;font-size:21px;font-family:'Cormorant Garamond',serif}
+  .brand .dot{width:9px;height:9px;border-radius:50%;
+    background:var(--sage);box-shadow:0 0 0 4px rgba(192,83,58,.18)}
+  .brand small{display:block;font-weight:300;font-size:12px;opacity:.7;letter-spacing:.04em;font-family:'Jost',sans-serif;text-transform:uppercase}
   .who{display:flex;align-items:center;gap:14px;font-size:13px}
   .who button{
-    background:rgba(255,255,255,.1);color:#eef3f0;border:1px solid rgba(255,255,255,.18);
-    padding:7px 13px;border-radius:9px;font-size:13px;cursor:pointer;font-family:inherit;
+    background:rgba(255,255,255,.4);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    color:var(--ink);border:1px solid var(--glass-brd);
+    padding:9px 18px;border-radius:40px;font-size:12px;cursor:pointer;font-family:inherit;
+    letter-spacing:.06em;text-transform:uppercase;transition:all .2s;
   }
-  .who button:hover{background:rgba(255,255,255,.18)}
+  .who button:hover{background:rgba(255,255,255,.7)}
 
   /* ---------- login ---------- */
   .login-screen{min-height:100vh;display:grid;place-items:center;padding:24px}
   .login-card{
-    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
-    box-shadow:var(--shadow);padding:36px 34px;width:100%;max-width:400px;
+    background:var(--surface);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+    border:1px solid var(--glass-brd);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:40px 36px;width:100%;max-width:410px;
+    animation:rise .5s cubic-bezier(.2,.8,.2,1);
   }
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
   .login-card h1{
-    font-family:'Fraunces',serif;font-weight:500;font-size:27px;
-    margin-bottom:6px;letter-spacing:-.01em;
+    font-family:'Cormorant Garamond',serif;font-weight:600;font-size:36px;
+    margin-bottom:6px;letter-spacing:.01em;
   }
-  .login-card p.sub{color:var(--ink-soft);font-size:14px;margin-bottom:26px}
-  label{display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--ink)}
+  .login-card p.sub{color:var(--ink-soft);font-size:14px;margin-bottom:28px}
+  label{display:block;font-size:12px;font-weight:500;margin-bottom:7px;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase}
   input,select,textarea{
-    width:100%;font-family:inherit;font-size:15px;color:var(--ink);
-    background:#fbfcfb;border:1px solid var(--line);border-radius:10px;
-    padding:11px 13px;transition:border-color .15s, box-shadow .15s;
+    width:100%;font-family:inherit;font-weight:400;font-size:16px;color:var(--ink);
+    background:rgba(255,255,255,.5);border:1px solid var(--glass-brd);border-radius:var(--radius-sm);
+    padding:14px 16px;transition:border-color .2s, box-shadow .2s, background .2s;
   }
   input:focus,select:focus,textarea:focus{
-    outline:none;border-color:var(--sage);box-shadow:0 0 0 3px var(--sage-tint);
+    outline:none;border-color:var(--sage);background:rgba(255,255,255,.8);box-shadow:0 0 0 4px var(--sage-tint);
   }
-  .field{margin-bottom:16px}
+  .field{margin-bottom:18px}
   .btn{
-    font-family:inherit;font-size:15px;font-weight:500;cursor:pointer;
-    border:none;border-radius:10px;padding:12px 18px;transition:background .15s,opacity .15s;
+    font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;letter-spacing:.1em;text-transform:uppercase;
+    border:none;border-radius:40px;padding:15px 28px;transition:transform .15s,background .2s,box-shadow .2s,opacity .15s;
   }
-  .btn-primary{background:var(--sage);color:#fff;width:100%}
-  .btn-primary:hover{background:var(--sage-deep)}
-  .btn-primary:disabled{opacity:.55;cursor:not-allowed}
+  .btn:hover{transform:translateY(-2px)}
+  .btn:active{transform:translateY(0)}
+  .btn-primary{background:var(--sage);color:#fff;width:100%;box-shadow:0 10px 28px rgba(192,83,58,.34)}
+  .btn-primary:hover{background:var(--sage-deep);box-shadow:0 14px 32px rgba(192,83,58,.42)}
+  .btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none}
   .err{color:var(--danger);font-size:13px;margin-top:12px;min-height:18px}
 
   /* ---------- app ---------- */
   main{padding:32px 0 80px}
   .page-title{
-    font-family:'Fraunces',serif;font-weight:500;font-size:26px;
-    letter-spacing:-.01em;margin-bottom:4px;
+    font-family:'Cormorant Garamond',serif;font-weight:600;font-size:40px;
+    letter-spacing:.01em;margin-bottom:4px;
   }
-  .page-sub{color:var(--ink-soft);font-size:14px;margin-bottom:26px}
+  .page-sub{color:var(--ink-soft);font-size:16px;margin-bottom:28px}
 
   /* stepper */
   .steps{display:flex;gap:0;margin-bottom:26px;flex-wrap:wrap}
@@ -110,21 +129,24 @@
   .step.done .num{background:var(--sage-tint);color:var(--sage)}
 
   .card{
-    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
-    box-shadow:var(--shadow);padding:24px;margin-bottom:18px;
+    background:var(--surface);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+    border:1px solid var(--glass-brd);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:28px;margin-bottom:18px;
+    animation:rise .45s cubic-bezier(.2,.8,.2,1);
   }
-  .card h2{font-size:15px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:9px}
-  .card h2 .idx{color:var(--amber);font-family:'Fraunces',serif;font-size:16px}
+  .card h2{font-family:'Cormorant Garamond',serif;font-size:23px;font-weight:600;margin-bottom:18px;display:flex;align-items:center;gap:10px}
+  .card h2 .idx{color:var(--sage);font-family:'Cormorant Garamond',serif;font-size:18px}
 
   /* psicólogo picker */
   .psi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
   .psi{
-    text-align:left;background:#fbfcfb;border:1.5px solid var(--line);border-radius:12px;
-    padding:15px 16px;cursor:pointer;transition:border-color .15s,background .15s;font-family:inherit;
+    text-align:left;background:rgba(255,255,255,.42);border:1px solid var(--glass-brd);border-radius:var(--radius-sm);
+    padding:17px 20px;cursor:pointer;transition:all .2s;font-family:inherit;
   }
-  .psi:hover{border-color:var(--sage);background:var(--sage-tint)}
+  .psi:hover{background:rgba(255,255,255,.72);transform:translateX(3px)}
   .psi.sel{border-color:var(--sage);background:var(--sage-tint)}
-  .psi .nome{font-weight:600;font-size:15px;color:var(--ink)}
+  .psi .nome{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:20px;color:var(--ink)}
+  .psi.sel .nome{color:var(--sage)}
   .psi .esp{font-size:13px;color:var(--ink-soft);margin-top:2px}
 
   /* date picker */
@@ -134,14 +156,14 @@
   /* horários */
   .slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px}
   .slot{
-    background:#fbfcfb;border:1.5px solid var(--line);border-radius:10px;
-    padding:12px 0;text-align:center;font-size:15px;font-weight:500;cursor:pointer;
-    font-family:inherit;color:var(--ink);transition:border-color .15s,background .15s;
+    background:rgba(255,255,255,.42);border:1px solid var(--glass-brd);border-radius:40px;
+    padding:15px 0;text-align:center;font-size:16px;font-weight:400;cursor:pointer;
+    font-family:inherit;color:var(--ink);transition:all .2s;
   }
-  .slot:hover{border-color:var(--sage);background:var(--sage-tint)}
-  .slot.sel{background:var(--sage);border-color:var(--sage);color:#fff}
+  .slot:hover{background:rgba(255,255,255,.76);transform:translateY(-2px)}
+  .slot.sel{background:var(--sage);border-color:var(--sage);color:#fff;box-shadow:0 8px 20px rgba(192,83,58,.32)}
   .empty{color:var(--ink-soft);font-size:14px;padding:22px 16px;text-align:center;
-    background:#fbfcfb;border:1px dashed var(--line);border-radius:10px}
+    background:rgba(255,255,255,.4);border:1px dashed var(--line-solid);border-radius:10px}
 
   /* confirm */
   .confirm-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -163,11 +185,11 @@
   .rec-preview .conf{color:var(--danger);font-weight:600}
 
   .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
-  .btn-ghost{background:transparent;color:var(--ink-soft);border:1px solid var(--line)}
-  .btn-ghost:hover{background:var(--bg)}
-  .btn-confirm{background:var(--sage);color:#fff;min-width:180px}
+  .btn-ghost{background:rgba(255,255,255,.4);color:var(--ink);border:1px solid var(--glass-brd)}
+  .btn-ghost:hover{background:rgba(255,255,255,.7)}
+  .btn-confirm{background:var(--sage);color:#fff;min-width:180px;box-shadow:0 10px 28px rgba(192,83,58,.34)}
   .btn-confirm:hover{background:var(--sage-deep)}
-  .btn-confirm:disabled{opacity:.55;cursor:not-allowed}
+  .btn-confirm:disabled{opacity:.55;cursor:not-allowed;transform:none}
 
   .hidden{display:none!important}
   .loading{color:var(--ink-soft);font-size:14px;padding:6px 0}
@@ -201,13 +223,16 @@
   .st.no{background:var(--danger-tint,#f4e0de);color:var(--danger)}
 
   /* modal */
-  .modal-bg{position:fixed;inset:0;background:rgba(28,39,35,.45);display:grid;place-items:center;
-    z-index:60;padding:20px}
-  .modal{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);
-    padding:26px;width:100%;max-width:420px}
-  .modal h3{font-family:'Fraunces',serif;font-weight:500;font-size:20px;margin-bottom:8px}
-  .modal-info{font-size:14px;color:var(--ink-soft);margin-bottom:16px}
-  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
+  .modal-bg{position:fixed;inset:0;background:rgba(68,48,42,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    display:grid;place-items:center;z-index:60;padding:20px;animation:fade .25s ease}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .modal{background:rgba(255,250,247,.82);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);
+    border:1px solid var(--glass-brd);border-radius:var(--radius);box-shadow:0 20px 60px rgba(68,48,42,.25);
+    padding:30px;width:100%;max-width:430px;animation:pop .35s cubic-bezier(.2,.9,.3,1.2)}
+  @keyframes pop{from{opacity:0;transform:scale(.94) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+  .modal h3{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:26px;margin-bottom:8px}
+  .modal-info{font-size:14px;color:var(--ink-soft);margin-bottom:18px}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
 
   /* consultas agendadas */
   .ag-row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line)}
