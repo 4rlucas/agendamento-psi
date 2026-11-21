@@ -16,7 +16,10 @@
     --sage:#c0533a; --sage-deep:#9a4026; --sage-tint:rgba(192,83,58,.14);
     --amber:#d98a86; --amber-tint:#f7e2de; --danger:#b4453a;
     --danger-tint:#f4e0de; --danger-text:#a23d33; /* vermelho para TEXTO: ≥4.5 sobre os tints */
-    --danger-pill:rgba(180,69,58,.13); /* fundo de selo/botão pequeno vermelho: visível sobre o vidro */
+    /* selos e botões pequenos: fundo OPACO, para o contraste não depender do que o blur do vidro mostra
+       (medido nos pixels renderizados: texto ≥ 5.4:1). ok = terracota, no = vermelho */
+    --pill-ok-bg:#f3dacf; --pill-ok-text:#8c3820;
+    --pill-no-bg:#efd3cd; --pill-no-text:#952f27;
     --radius:24px; --radius-sm:16px; --glass-brd:rgba(255,255,255,.6);
     --cell-brd:#a3857a; /* borda de célula vazia: 3:1 contra o fundo (WCAG 1.4.11) */
     --busy-brd:#a35d61; /* borda "Consulta marcada": rosa queimado escuro, 3.9:1 (antes #d98a86 = 2.13) */
@@ -85,7 +88,8 @@
   .btn-ghost:hover{background:rgba(255,255,255,.7)}
   .err{color:var(--danger-text);font-size:13px;margin-top:12px;min-height:18px}
 
-  main{padding:32px 0 80px}
+  /* main.wrap (e não só main): .wrap tem mais especificidade e zerava o padding vertical */
+  main.wrap{padding-top:32px;padding-bottom:80px}
   .greeting{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:38px;margin-bottom:2px}
   .greeting-sub{color:var(--ink-soft);font-size:16px;margin-bottom:24px}
 
@@ -165,13 +169,14 @@
   .appt .pac{font-weight:600;font-size:15px}
   .appt .obs{font-size:13px;color:var(--ink-soft);margin-top:3px}
   .vazio{font-style:italic;color:var(--ink-soft)} /* "Sem observações": sem opacity, 5.4:1 */
-  .appt .tel{font-size:12px;color:var(--ink-soft);margin-top:2px}
+  .appt .tel{font-size:12px;color:var(--ink-soft);margin-top:2px;overflow-wrap:break-word}
+  .nw{white-space:nowrap}
   /* selo: estilo base vale em qualquer lista (antes só dentro de .appt; no Histórico ficava sem padding) */
   .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:8px}
   .appt .tag{margin-top:6px}
-  .tag.confirmado{background:var(--sage-tint);color:var(--sage-deep)}
+  .tag.confirmado{background:var(--pill-ok-bg);color:var(--pill-ok-text)}
   .tag.realizada{background:#e6ebe9;color:var(--ink-soft)}
-  .tag.faltou{background:var(--danger-pill);color:var(--danger-text)}
+  .tag.faltou{background:var(--pill-no-bg);color:var(--pill-no-text)}
 
   /* feedback */
   .fb-item{padding:16px 0;border-bottom:1px solid var(--line)}
@@ -215,7 +220,7 @@
     .agenda-row{flex-direction:column;align-items:stretch}
     .agenda-row .btn{width:100%}
   }
-  .btn-copiar{background:var(--sage-tint);color:var(--sage-deep);border:none;border-radius:6px;
+  .btn-copiar{background:var(--pill-ok-bg);color:var(--pill-ok-text);border:none;border-radius:6px;
     padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;margin-left:4px;min-height:26px}
   .btn-copiar:hover{background:var(--sage);color:#fff}
   .agenda-status{font-size:13px;margin-top:10px}
@@ -224,7 +229,7 @@
 
   /* ações no rodapé da consulta */
   .appt-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
-  .btn-mover-sm{background:var(--sage-tint);color:var(--sage-deep);border:none;border-radius:8px;
+  .btn-mover-sm{background:var(--pill-ok-bg);color:var(--pill-ok-text);border:none;border-radius:8px;
     padding:6px 12px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
   .btn-mover-sm:hover{background:var(--sage);color:#fff}
 
@@ -248,7 +253,7 @@
   /* ================= RESPONSIVO ================= */
   @media (max-width:768px){
     .wrap{padding:0 16px}
-    main{padding:20px 0 calc(60px + env(safe-area-inset-bottom,0px))}
+    main.wrap{padding-top:20px;padding-bottom:calc(60px + env(safe-area-inset-bottom,0px))}
     .appt-foot .btn-mover-sm{padding:10px 16px;min-height:40px}
     .greeting{font-size:30px;line-height:1.2} /* maior que o h2 dos cards (23px) */
     /* abas rolam horizontalmente */
@@ -513,6 +518,9 @@ const $$=s=>document.querySelectorAll(s);
 // escapa texto vindo do banco/usuário antes de ir para innerHTML ou atributo
 const ESC_MAP={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>ESC_MAP[c]);
+// telefone: só o trecho "dígitos-hífen-dígitos" não quebra (o número não se parte no hífen);
+// o resto (ex: um recado) quebra normalmente, então nada vaza da tela
+const telHtml=t=>esc(t).replace(/(\(\d+\)\s?)?\d+-\d+/g,m=>'<span class="nw">'+m+'</span>');
 const DOW=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 
@@ -805,7 +813,7 @@ async function loadConsultas(){
         <div class="h">${esc(hhmm(a.hora))}</div></div>
       <div class="body">
         <div class="pac">${esc(a.cliente_nome)}</div>
-        ${a.cliente_telefone?`<div class="tel">${esc(a.cliente_telefone)}</div>`:''}
+        ${a.cliente_telefone?`<div class="tel">${telHtml(a.cliente_telefone)}</div>`:''}
         ${a.observacoes?`<div class="obs">${esc(a.observacoes)}</div>`:'<div class="obs vazio">Sem observações</div>'}
         <div class="appt-foot">
           <span class="tag ${a.status==='realizada'?'realizada':'confirmado'}">${a.status==='realizada'?'Realizada':'Confirmada'}</span>

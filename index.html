@@ -23,7 +23,10 @@
     --amber:#d98a86;       /* rosa queimado */
     --danger:#b4453a;
     --danger-text:#a23d33;  /* vermelho para TEXTO: ≥4.5 sobre os tints */
-    --danger-pill:rgba(180,69,58,.13); /* fundo de selo/botão pequeno vermelho: visível sobre o vidro */
+    /* selos e botões pequenos: fundo OPACO, para o contraste não depender do que o blur do vidro mostra
+       (medido nos pixels renderizados: texto ≥ 5.4:1). ok = terracota, no = vermelho */
+    --pill-ok-bg:#f3dacf; --pill-ok-text:#8c3820;
+    --pill-no-bg:#efd3cd; --pill-no-text:#952f27;
     --danger-tint:#f4e0de;
     --radius:24px;
     --radius-sm:16px;
@@ -115,7 +118,8 @@
   .err{color:var(--danger-text);font-size:13px;margin-top:12px;min-height:18px}
 
   /* ---------- app ---------- */
-  main{padding:32px 0 80px}
+  /* main.wrap (e não só main): .wrap tem mais especificidade e zerava o padding vertical */
+  main.wrap{padding-top:32px;padding-bottom:80px}
   .page-title{
     font-family:'Cormorant Garamond',serif;font-weight:600;font-size:40px;
     letter-spacing:.01em;margin-bottom:4px;
@@ -135,7 +139,7 @@
   }
   .step.active{color:var(--ink);font-weight:500}
   .step.active .num{background:var(--sage);color:#fff}
-  .step.done .num{background:var(--sage-tint);color:var(--sage-deep)}
+  .step.done .num{background:var(--pill-ok-bg);color:var(--pill-ok-text)}
 
   .card{
     background:var(--surface);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
@@ -235,8 +239,8 @@
   .cmp-row .when{min-width:130px;font-size:13px;color:var(--ink-soft)}
   .cmp-row .nome{flex:1;font-weight:500}
   .cmp-row .st{font-size:12px;font-weight:600;padding:3px 11px;border-radius:8px}
-  .st.ok{background:var(--sage-tint);color:var(--sage-deep)}
-  .st.no{background:var(--danger-pill);color:var(--danger-text)}
+  .st.ok{background:var(--pill-ok-bg);color:var(--pill-ok-text)}
+  .st.no{background:var(--pill-no-bg);color:var(--pill-no-text)}
 
   /* modal */
   /* fundo do modal rola quando o conteúdo não cabe (tela baixa / celular deitado) */
@@ -259,20 +263,20 @@
   .ag-row .when{min-width:120px;font-size:13px;color:var(--ink-soft)}
   .ag-row .info{flex:1}
   .ag-row .info .nome{font-weight:500}
-  .ag-row .info .meta{font-size:12px;color:var(--ink-soft)}
+  .ag-row .info .meta{font-size:12px;color:var(--ink-soft);overflow-wrap:break-word}
   .nw{white-space:nowrap}
-  .btn-cancel-sm{background:var(--danger-pill);color:var(--danger-text);border:none;
+  .btn-cancel-sm{background:var(--pill-no-bg);color:var(--pill-no-text);border:none;
     border-radius:8px;padding:7px 13px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
   .btn-cancel-sm:hover{background:var(--danger);color:#fff}
   .ag-acoes{display:flex;gap:8px;flex-wrap:wrap}
-  .btn-mover-sm{background:var(--sage-tint);color:var(--sage-deep);border:none;
+  .btn-mover-sm{background:var(--pill-ok-bg);color:var(--pill-ok-text);border:none;
     border-radius:8px;padding:7px 13px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
   .btn-mover-sm:hover{background:var(--sage);color:#fff}
 
   /* ================= RESPONSIVO ================= */
   @media (max-width:768px){
     .wrap{padding:0 16px}
-    main{padding:20px 0 calc(60px + env(safe-area-inset-bottom,0px))}
+    main.wrap{padding-top:20px;padding-bottom:calc(60px + env(safe-area-inset-bottom,0px))}
     .page-title{font-size:30px;line-height:1.2} /* maior que o h2 dos cards (23px) */
     .rtabs{overflow-x:auto;-webkit-overflow-scrolling:touch;gap:2px}
     .rtab{white-space:nowrap;padding:12px 13px;font-size:14px}
@@ -365,6 +369,15 @@
   .dp-day.muted:hover{background:none;transform:none}
   .dp-nav:disabled{opacity:.35;cursor:not-allowed}
   .dp-nav:disabled:hover{background:rgba(255,255,255,.5);color:var(--sage);transform:none}
+  /* tela baixa (celular deitado): dias mais baixos para um mês de 6 linhas caber sem rolagem interna */
+  @media (max-height:500px){
+    .dp-pop{padding:12px}
+    .dp-head{margin-bottom:6px}
+    .dp-nav{width:30px;height:30px}
+    .dp-dows span{padding:2px 0}
+    .dp-days{gap:2px}
+    .dp-day{aspect-ratio:auto;height:30px;border-radius:10px}
+  }
   /* micro-interações extras */
   .slot:active,.psi:active,.btn:active{transform:scale(.97)}
   @keyframes pulse-sel{0%{box-shadow:0 0 0 0 rgba(192,83,58,.45)}100%{box-shadow:0 0 0 14px rgba(192,83,58,0)}}
@@ -678,6 +691,9 @@ const $ = s => document.querySelector(s);
 // escapa texto vindo do banco/usuário antes de ir para innerHTML ou atributo
 const ESC_MAP={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ESC_MAP[c]);
+// telefone: só o trecho "dígitos-hífen-dígitos" não quebra (o número não se parte no hífen);
+// o resto (ex: um recado) quebra normalmente, então nada vaza da tela
+const telHtml=t=>esc(t).replace(/(\(\d+\)\s?)?\d+-\d+/g,m=>'<span class="nw">'+m+'</span>');
 // data local AAAA-MM-DD (toISOString usa UTC e erra o dia depois das 21h em Brasília)
 const isoLocal = (d=new Date()) => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 function toast(msg, isErr=false){
@@ -1110,7 +1126,7 @@ async function loadAgendadas(){
       <div class="when">${quando} · ${esc(h)}</div>
       <div class="info">
         <div class="nome">${esc(r.cliente_nome)}</div>
-        <div class="meta">${esc(r.psicologo_nome)}${r.cliente_telefone?' · <span class="nw">'+esc(r.cliente_telefone)+'</span>':''}</div>
+        <div class="meta">${esc(r.psicologo_nome)}${r.cliente_telefone?' · '+telHtml(r.cliente_telefone):''}</div>
       </div>
       <div class="ag-acoes">
         <button class="btn-mover-sm" data-id="${esc(r.id)}"
