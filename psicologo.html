@@ -18,6 +18,8 @@
     --danger-tint:#f4e0de; --danger-text:#a23d33; /* vermelho para TEXTO: ≥4.5 sobre os tints */
     --radius:24px; --radius-sm:16px; --glass-brd:rgba(255,255,255,.6);
     --cell-brd:#a3857a; /* borda de célula vazia: 3:1 contra o fundo (WCAG 1.4.11) */
+    --busy-brd:#a35d61; /* borda "Consulta marcada": rosa queimado escuro, 3.9:1 (antes #d98a86 = 2.13) */
+    --cal-col-bg:#fbf0ea; /* cor opaca equivalente ao card de vidro: fundo da coluna de horários fixa */
     --shadow:0 10px 44px rgba(68,48,42,.1);
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -133,14 +135,14 @@
   .cell:hover{border-color:var(--sage);transform:scale(1.04)}
   .cell.free{background:var(--sage-tint);border-color:var(--sage);color:var(--sage-deep);font-weight:600}
   .cell.free::after{content:'✓'}
-  .cell.busy{background:var(--amber-tint);border-color:var(--amber);color:var(--sage-deep);
+  .cell.busy{background:var(--amber-tint);border-color:var(--busy-brd);color:var(--sage-deep);
     font-weight:600;cursor:not-allowed}
   .cell.busy::after{content:'●'}
   .cal-legend{display:flex;gap:18px;margin-top:14px;font-size:12px;color:var(--ink-soft);flex-wrap:wrap}
   .cal-legend .k{display:inline-flex;align-items:center;gap:6px}
   .cal-legend .sw{width:14px;height:14px;border-radius:5px;border:1.5px solid}
   .sw.free{background:var(--sage-tint);border-color:var(--sage)}
-  .sw.busy{background:var(--amber-tint);border-color:var(--amber)}
+  .sw.busy{background:var(--amber-tint);border-color:var(--busy-brd)}
   .sw.closed{background:var(--surface-solid);border-color:var(--cell-brd);border-width:1px}
   .cell.past{opacity:.45;cursor:not-allowed}
   .cell.past:hover{transform:none;border-color:var(--cell-brd)}
@@ -248,13 +250,17 @@
     .grade-row .field{width:100%}
     .grade-row .btn{width:100%}
     /* calendário: coluna de horário fixa + dias largos com snap pro toque */
-    .cal{-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;
+    /* scroll-padding-left = padding (6) + coluna de horários + vão (5): o snap alinha os dias
+       logo DEPOIS da coluna fixa, nunca por baixo dela */
+    .cal{-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;scroll-padding-left:59px;
       position:relative;border:1px solid var(--line);border-radius:12px;padding:6px}
     .cal-grid{grid-template-columns:48px repeat(7,minmax(104px,1fr));min-width:800px}
-    /* coluna de horários gruda na esquerda ao rolar */
-    .time-label,.cal-grid > .day-head:first-child{position:sticky;left:0;z-index:3;
-      background:var(--surface)}
-    .cal-grid > div:nth-child(8n+1){scroll-snap-align:start}
+    /* coluna de horários e o canto do cabeçalho grudam na esquerda com fundo OPACO.
+       A sombra sólida (3px em volta) emenda os rótulos numa faixa contínua: cobre os vãos de 5px
+       entre as linhas, o padding de 6px à esquerda e o vão de 5px até a 1ª coluna de dias. */
+    .time-label,.cal-corner{position:sticky;left:0;z-index:3;background:var(--cal-col-bg);
+      box-shadow:-3px 0 0 3px var(--cal-col-bg),2px 0 0 3px var(--cal-col-bg)}
+    .time-label{height:auto;align-self:stretch} /* acompanha a célula (48px no mobile), sem faixa vazia */
     .cell{height:48px}
     .day-head{scroll-snap-align:start}
     .day-head .dnum{font-size:17px}
@@ -286,6 +292,7 @@
   @media (max-width:480px){
     .card{padding:18px}
     .cal-grid{grid-template-columns:46px repeat(7,minmax(96px,1fr));min-width:740px}
+    .cal{scroll-padding-left:57px} /* 6 + 46 + 5 */
     .time-label{font-size:11px}
   }
   /* respeita quem prefere menos movimento (acessibilidade) */
