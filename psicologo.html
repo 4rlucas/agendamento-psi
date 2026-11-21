@@ -147,6 +147,12 @@
   .cell.past{opacity:.45;cursor:not-allowed}
   .cell.past:hover{transform:none;border-color:var(--cell-brd)}
   .cal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+  /* semana carregando/salvando: grade visível mas sem interação */
+  .cal-grid.travada{opacity:.5;cursor:progress}
+  .cal-grid.travada .cell{pointer-events:none}
+  .cal-erro{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:14px 16px;border-radius:12px;
+    background:var(--danger-tint);color:var(--danger-text);font-size:14px;margin-bottom:4px}
+  .cal-erro .btn{width:auto}
 
   /* consultas */
   .appt{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
@@ -176,6 +182,7 @@
   .chip.sel-no{background:var(--danger-tint);border-color:var(--danger);color:var(--danger-text)}
   .fb-item textarea{margin-bottom:10px}
   .fb-save{display:flex;justify-content:flex-end}
+  .fb-aviso{font-size:14px;color:var(--danger-text);background:var(--danger-tint);border-radius:10px;padding:10px 12px;margin:10px 0 12px}
   .btn-sm{font-size:13px;padding:8px 14px}
 
   .empty{color:var(--ink-soft);font-size:14px;padding:22px 16px;text-align:center;
@@ -400,6 +407,7 @@
           <div class="label" id="weekLabel">—</div>
           <button id="nextWeek" title="Próxima semana">›</button>
         </div>
+        <div id="calErro" class="cal-erro hidden" role="alert"></div>
         <div class="cal-scroll-hint">← arraste para ver todos os dias da semana →</div>
         <div class="cal">
           <div id="calGrid" class="cal-grid" role="group" aria-label="Horários da semana. Use as setas para navegar e Enter para liberar ou fechar."></div>
@@ -647,21 +655,43 @@ function gradeSlots(){
 
 // ===== CALENDÁRIO (liberar agenda) =====
 let weekSeq=0; // só a última semana pedida é desenhada
+// trava da grade: enquanto a semana carrega ou salva, nenhuma célula muda; se a leitura falhou, não dá pra salvar
+let carregandoSemana=false, salvandoSemana=false, erroSemana=null;
+function atualizaTravaSemana(){
+  const g=$('#calGrid'), trava=carregandoSemana||salvandoSemana;
+  if(trava) g.setAttribute('aria-busy','true'); else g.removeAttribute('aria-busy');
+  g.classList.toggle('travada',trava);
+  $('#btnSalvarSemana').disabled=trava||!!erroSemana;
+}
+// sem a grade (erro de leitura), a dica de arrastar e a legenda também saem
+function mostraGradeSemana(on){['.cal','.cal-scroll-hint','.cal-legend'].forEach(s=>$(s).classList.toggle('hidden',!on));}
 async function renderWeek(){
   const start=state.weekStart, end=addDays(start,6);
   const label=`${start.getDate()} ${MES[start.getMonth()]} – ${end.getDate()} ${MES[end.getMonth()]}`;
   $('#weekLabel').textContent=label;
   const grid=$('#calGrid'); const todayIso=isoDate(new Date());
   const seq=++weekSeq;
-  grid.setAttribute('aria-busy','true'); grid.style.opacity='.5';
+  carregandoSemana=true; atualizaTravaSemana();
 
   // carrega slots já liberados/ocupados da semana
-  const{data:slots,error}=await sb.rpc('meus_slots',{p_inicio:isoDate(start),p_fim:isoDate(end)});
+  let slots=null, error=null;
+  try{ ({data:slots,error}=await sb.rpc('meus_slots',{p_inicio:isoDate(start),p_fim:isoDate(end)})); }
+  catch(e){ error=e; }
   if(seq!==weekSeq) return; // usuário já navegou para outra semana
-  grid.removeAttribute('aria-busy'); grid.style.opacity='';
+  carregandoSemana=false;
   const times=gradeSlots();
   state.slotsExist.clear(); state.cellSel.clear();
-  if(error){toast('Erro ao carregar semana: '+error.message,true);}
+  const caixaErro=$('#calErro');
+  if(error){
+    // não desenha uma semana "vazia": sem saber o que está liberado, salvar apagaria/duplicaria horários
+    erroSemana=error.message||String(error);
+    grid.innerHTML=''; mostraGradeSemana(false);
+    caixaErro.innerHTML=`<span>Não foi possível carregar os horários desta semana (${esc(erroSemana)}). Nada pode ser salvo até carregar.</span><button type="button" class="btn btn-ghost btn-sm">Tentar de novo</button>`;
+    caixaErro.querySelector('button').addEventListener('click',()=>renderWeek());
+    caixaErro.classList.remove('hidden');
+    atualizaTravaSemana(); return;
+  }
+  erroSemana=null; caixaErro.classList.add('hidden'); caixaErro.innerHTML=''; mostraGradeSemana(true);
   (slots||[]).forEach(s=>{state.slotsExist.set(isoDate(new Date(s.data+'T00:00:00'))+'|'+hhmm(s.hora),s.ocupado);});
 
   // header
@@ -684,8 +714,10 @@ async function renderWeek(){
       primeira=false;}
   });
   grid.innerHTML=html;
+  atualizaTravaSemana();
   grid.querySelectorAll('.cell').forEach(c=>{
     c.addEventListener('click',()=>{
+      if(carregandoSemana||salvandoSemana) return; // teclado (Enter/Espaço) também passa por aqui
       grid.querySelectorAll('.cell').forEach(x=>x.tabIndex=-1); c.tabIndex=0;
       if(c.dataset.busy==='1'){toast('Há consulta marcada neste horário.',true);return;}
       if(c.dataset.past==='1'){toast('Este horário já passou.',true);return;}
@@ -719,7 +751,8 @@ $('#nextWeek').addEventListener('click',()=>{state.weekStart=addDays(state.weekS
 
 $('#btnSalvarSemana').addEventListener('click',async()=>{
   // diferença: adicionar novos (na seleção, sem existir) e remover os que existiam e foram tirados
-  if($('#calGrid').hasAttribute('aria-busy')){toast('Aguarde a semana terminar de carregar.',true);return;}
+  if(carregandoSemana||salvandoSemana){toast('Aguarde a semana terminar de carregar.',true);return;}
+  if(erroSemana){toast('Os horários desta semana não carregaram. Tente carregar de novo antes de salvar.',true);return;}
   const toAdd=[], toRemove=[];
   const start=state.weekStart;
   // percorre todos os slots possíveis da semana
@@ -730,14 +763,14 @@ $('#btnSalvarSemana').addEventListener('click',async()=>{
       if(selected&&!existed)toAdd.push({data:iso,hora:t});
       if(!selected&&existed)toRemove.push({data:iso,hora:t});
     });}
-  const b=$('#btnSalvarSemana');b.disabled=true;b.textContent='Salvando…';
+  const b=$('#btnSalvarSemana');salvandoSemana=true;atualizaTravaSemana();b.textContent='Salvando…';
   try{
     if(toAdd.length){const{error}=await sb.rpc('liberar_slots',{p_slots:toAdd,p_duracao_min:state.grade.dur});if(error)throw error;}
     for(const r of toRemove){const{error}=await sb.rpc('remover_slot',{p_data:r.data,p_hora:r.hora});if(error)throw error;}
     toast(`Horários atualizados (${toAdd.length} liberados, ${toRemove.length} removidos).`);
     await renderWeek();
   }catch(e){toast('Erro ao salvar: '+e.message,true);}
-  b.disabled=false;b.textContent='Salvar horários da semana';
+  finally{salvandoSemana=false;b.textContent='Salvar horários da semana';atualizaTravaSemana();}
 });
 
 // ===== CONSULTAS =====
@@ -800,10 +833,13 @@ async function fetchPendentes(){
   const ids=ags.map(a=>a.id);
   let comEvo=new Set();
   if(ids.length){
-    const{data:evos}=await sb.from('sessoes_evolucao').select('agendamento_id').in('agendamento_id',ids);
+    const{data:evos,error:eEvo}=await sb.from('sessoes_evolucao').select('agendamento_id').in('agendamento_id',ids);
+    if(eEvo)return{err:eEvo}; // sem saber quem já tem evolução, a lista estaria errada
     (evos||[]).forEach(e=>comEvo.add(e.agendamento_id));
   }
-  return{pend:ags.filter(a=>!comEvo.has(a.id))};
+  // pendente = sem evolução, OU com evolução mas ainda não marcada como realizada
+  // (a 2ª gravação falhou: fica na lista só para concluir o status)
+  return{pend:ags.filter(a=>!comEvo.has(a.id)||a.status!=='realizada').map(a=>({...a,evoSalva:comEvo.has(a.id)}))};
 }
 async function loadFeedbackCount(){
   const r=await fetchPendentes();if(r.err)return;
@@ -818,11 +854,14 @@ async function loadFeedback(){
   box.className='';
   box.innerHTML=r.pend.map(a=>{
     const d=new Date(a.data+'T00:00:00');
-    return `<div class="fb-item" data-id="${esc(a.id)}">
-      <div class="fb-head">
+    const head=`<div class="fb-head">
         <span class="pac">${esc(a.cliente_nome)}</span>
         <span class="meta">${DOW[d.getDay()]} ${d.getDate()}/${pad(d.getMonth()+1)} · ${esc(hhmm(a.hora))}</span>
-      </div>
+      </div>`;
+    if(a.evoSalva) return `<div class="fb-item" data-id="${esc(a.id)}" data-evo="1">${head}${AVISO_STATUS}
+      <div class="fb-save"><button class="btn btn-primary btn-sm">${TXT_STATUS}</button></div></div>`;
+    return `<div class="fb-item" data-id="${esc(a.id)}">
+      ${head}
       <div class="fb-controls">
         <button type="button" class="chip chip-ok" data-v="1" aria-pressed="false">Compareceu</button>
         <button type="button" class="chip chip-no" data-v="0" aria-pressed="false">Faltou</button>
@@ -832,30 +871,47 @@ async function loadFeedback(){
     </div>`;
   }).join('');
   box.querySelectorAll('.fb-item').forEach(item=>{
+    item.querySelector('.btn').addEventListener('click',()=>salvarEvolucao(item));
+    if(item.dataset.evo==='1') return;
     const ok=item.querySelector('.chip-ok'),no=item.querySelector('.chip-no');
     const marcar=v=>{ok.classList.toggle('sel-ok',v);no.classList.toggle('sel-no',!v);ok.setAttribute('aria-pressed',String(v));no.setAttribute('aria-pressed',String(!v));};
     ok.addEventListener('click',()=>marcar(true));
     no.addEventListener('click',()=>marcar(false));
-    item.querySelector('.btn').addEventListener('click',()=>salvarEvolucao(item));
   });
 }
+const TXT_STATUS='Marcar como realizada';
+const AVISO_STATUS='<p class="fb-aviso">A evolução desta sessão já está salva, mas a consulta ainda não foi marcada como realizada. Conclua para tirá-la da lista.</p>';
+// trava o registro inteiro (escolha, texto e botão) enquanto grava
+function travaRegistro(item,on){item.querySelectorAll('button,textarea').forEach(el=>el.disabled=on);item.setAttribute('aria-busy',String(on));}
 async function salvarEvolucao(item){
   const id=item.dataset.id;
-  const ok=item.querySelector('.chip-ok').classList.contains('sel-ok'), no=item.querySelector('.chip-no').classList.contains('sel-no');
-  if(!ok&&!no){ toast('Marque se o paciente compareceu ou faltou.',true); item.querySelector('.chip-ok').focus(); return; }
-  const compareceu=ok;
-  const evo=item.querySelector('textarea').value.trim();
-  const b=item.querySelector('.btn');b.disabled=true;b.textContent='Salvando…';
-  const{error:e1}=await sb.from('sessoes_evolucao').insert({
-    agendamento_id:id,psicologo_id:state.psicologoId,compareceu,evolucao:evo||null
-  });
-  if(e1){b.disabled=false;b.textContent='Salvar registro';toast('Erro ao salvar: '+e1.message,true);return;}
-  // marca o agendamento como realizado
-  const{error:e2}=await sb.from('agendamentos').update({status:'realizada'}).eq('id',id);
+  const b=item.querySelector('.btn');
+  // 1ª etapa (só se ainda não houver evolução gravada): insere a evolução
+  if(item.dataset.evo!=='1'){
+    const ok=item.querySelector('.chip-ok').classList.contains('sel-ok'), no=item.querySelector('.chip-no').classList.contains('sel-no');
+    if(!ok&&!no){ toast('Marque se o paciente compareceu ou faltou.',true); item.querySelector('.chip-ok').focus(); return; }
+    const compareceu=ok;
+    const evo=item.querySelector('textarea').value.trim();
+    travaRegistro(item,true);b.textContent='Salvando…';
+    let e1=null;
+    try{ ({error:e1}=await sb.from('sessoes_evolucao').insert({
+      agendamento_id:id,psicologo_id:state.psicologoId,compareceu,evolucao:evo||null
+    })); }catch(e){ e1=e; }
+    if(e1){travaRegistro(item,false);b.textContent='Salvar registro';toast('Erro ao salvar: '+e1.message,true);return;}
+    item.dataset.evo='1';
+  }else{ travaRegistro(item,true);b.textContent='Salvando…'; }
+  // 2ª etapa: marca o agendamento como realizado
+  let e2=null;
+  try{ ({error:e2}=await sb.from('agendamentos').update({status:'realizada'}).eq('id',id)); }catch(e){ e2=e; }
   if(e2){
-    // a evolução foi gravada (sai da lista de pendentes), mas o status não mudou: avisa de forma honesta
-    toast('Evolução salva, mas não foi possível marcar a consulta como realizada: '+e2.message,true);
-  }else toast('Registro salvo.');
+    // a evolução está gravada mas o status não: a sessão FICA na lista, só com a ação de concluir o status
+    item.querySelector('.fb-controls')?.remove(); item.querySelector('textarea')?.remove();
+    if(!item.querySelector('.fb-aviso')) item.querySelector('.fb-save').insertAdjacentHTML('beforebegin',AVISO_STATUS);
+    travaRegistro(item,false); b.textContent=TXT_STATUS; b.focus();
+    toast('Evolução salva, mas a consulta não foi marcada como realizada ('+e2.message+'). Use "'+TXT_STATUS+'" para concluir.',true);
+    return;
+  }
+  toast('Registro salvo.');
   item.remove(); loadFeedbackCount();
   if(!$('#fbList').children.length){$('#fbList').className='empty';$('#fbList').textContent='Nenhuma sessão aguardando registro. 🌿';}
 }

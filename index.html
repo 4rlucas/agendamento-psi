@@ -195,6 +195,9 @@
   .rec-preview .conf{color:var(--danger-text);font-weight:600}
 
   .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px;flex-wrap:wrap}
+  /* envio em curso: o que alimenta a marcação fica visível, mas inerte */
+  #rpanel-marcar.enviando{cursor:progress}
+  #rpanel-marcar.enviando [inert]{opacity:.55;transition:opacity .2s}
   .btn-ghost{background:rgba(255,255,255,.4);color:var(--ink);border:1px solid var(--glass-brd)}
   .btn-ghost:hover{background:rgba(255,255,255,.7)}
   .btn-confirm{background:var(--sage);color:#fff;min-width:180px;box-shadow:0 10px 28px rgba(192,83,58,.34)}
@@ -905,10 +908,26 @@ async function previewRecorrencia(){
         + ocupadas.map(d=>fmt(d.data)).join(', ') : '');
 }
 
+// trava todo o fluxo de marcação durante o envio: profissional, dia, horário, dados do paciente,
+// recorrência e "Recomeçar". O envio usa o que estava na tela no clique; nada pode mudar até terminar.
+let enviandoMarcacao=false;
+function travarMarcacao(on){
+  enviandoMarcacao=on;
+  ['#cardPsi','#cardData','#cardSlots','#cardConfirm .confirm-grid','#btnCancelar'].forEach(s=>{ $(s).inert=on; });
+  const p=$('#rpanel-marcar'); p.classList.toggle('enviando',on);
+  if(on) p.setAttribute('aria-busy','true'); else p.removeAttribute('aria-busy');
+}
 $('#btnConfirmar').addEventListener('click', async ()=>{
+  if(enviandoMarcacao) return;
   const nome=$('#cliNome').value.trim();
   if(!nome){ toast('Informe o nome do paciente.',true); $('#cliNome').focus(); return; }
-  const btn=$('#btnConfirmar'); btn.disabled=true; btn.textContent='Marcando…';
+  const btn=$('#btnConfirmar');
+  travarMarcacao(true); btn.disabled=true; btn.textContent='Marcando…';
+  try{ await enviarMarcacao(nome, btn); }
+  catch(e){ toast('Erro ao marcar: '+(e?.message||e),true); }
+  finally{ travarMarcacao(false); btn.disabled=false; btn.textContent='Confirmar e marcar'; }
+});
+async function enviarMarcacao(nome, btn){
 
   const comum={
     p_cliente_nome: nome,
@@ -961,7 +980,7 @@ $('#btnConfirmar').addEventListener('click', async ()=>{
   else{ toast('Consulta marcada, mas houve erro ao adicionar no Google Agenda.', true);
     console.error('Falha Google Calendar:', gcal.error); }
   resetAll();
-});
+}
 
 // cria eventos no Google para todos os agendamentos de uma recorrência
 async function marcarRecorrenciaNoGoogle(recId){
