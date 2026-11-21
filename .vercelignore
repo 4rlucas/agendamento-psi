@@ -1,0 +1,8 @@
+# Só os dois HTML da raiz devem ir para a Vercel.
+docs/
+sql/
+supabase/
+README.md
+*.exe
+*.dll
+*.lock

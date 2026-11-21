@@ -1,0 +1,7 @@
+*.exe
+*.dll
+*.lock
+.vercel/
+.env*
+# documentação interna (IDs e e-mails de teste): só local, fora do repositório público
+docs/
