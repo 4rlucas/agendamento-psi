@@ -122,7 +122,8 @@
   .day-head.today .dow{color:var(--sage-deep)}
   .time-label{font-size:12px;color:var(--ink-soft);display:flex;align-items:center;justify-content:flex-end;
     padding-right:6px;height:38px}
-  .cell{height:38px;border-radius:10px;border:1.5px solid var(--line-solid);background:var(--surface-solid);cursor:pointer;
+  .cell{height:38px;width:100%;padding:0;font-family:inherit;
+    border-radius:10px;border:1.5px solid var(--line-solid);background:var(--surface-solid);cursor:pointer;
     transition:background .15s,border-color .15s,transform .1s;font-size:12px;display:flex;align-items:center;
     justify-content:center;color:transparent;user-select:none}
   .cell:hover{border-color:var(--sage);transform:scale(1.04)}
@@ -373,10 +374,10 @@
         <h2>Minha grade de atendimento</h2>
         <p class="hint">Defina sua faixa de horário e a duração das sessões. O calendário abaixo usa essa configuração.</p>
         <div class="grade-row">
-          <div class="field"><label>Início</label><input id="gInicio" type="time" value="08:00"></div>
-          <div class="field"><label>Fim</label><input id="gFim" type="time" value="18:00"></div>
-          <div class="field"><label>Duração (min)</label><input id="gDur" type="number" min="10" step="5" value="50"></div>
-          <div class="field"><label>Intervalo (min)</label><input id="gInt" type="number" min="0" step="5" value="0"></div>
+          <div class="field"><label for="gInicio">Início</label><input id="gInicio" type="time" value="08:00"></div>
+          <div class="field"><label for="gFim">Fim</label><input id="gFim" type="time" value="18:00"></div>
+          <div class="field"><label for="gDur">Duração (min)</label><input id="gDur" type="number" min="10" step="5" value="50"></div>
+          <div class="field"><label for="gInt">Intervalo (min)</label><input id="gInt" type="number" min="0" step="5" value="0"></div>
           <button id="btnSalvarGrade" class="btn btn-primary">Salvar grade</button>
         </div>
       </div>
@@ -389,7 +390,7 @@
         </div>
         <div class="cal-scroll-hint">← arraste para ver todos os dias da semana →</div>
         <div class="cal">
-          <div id="calGrid" class="cal-grid"></div>
+          <div id="calGrid" class="cal-grid" role="group" aria-label="Horários da semana. Use as setas para navegar e Enter para liberar ou fechar."></div>
         </div>
         <div class="cal-legend">
           <span class="k"><span class="sw closed"></span> Fechado (clique para liberar)</span>
@@ -457,8 +458,8 @@
 </div>
 
 <div id="moverModal" class="modal-bg hidden">
-  <div class="modal">
-    <h3>Mudar horário</h3>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="moverTitulo" aria-describedby="moverInfo">
+    <h3 id="moverTitulo">Mudar horário</h3>
     <p id="moverInfo" class="modal-info"></p>
     <div class="field">
       <label for="moverHora">Novo horário</label>
@@ -650,27 +651,50 @@ async function renderWeek(){
   (slots||[]).forEach(s=>{state.slotsExist.set(isoDate(new Date(s.data+'T00:00:00'))+'|'+hhmm(s.hora),s.ocupado);});
 
   // header
-  let html='<div></div>';
+  let html='<div class="cal-corner" aria-hidden="true"></div>';
   for(let i=0;i<7;i++){const d=addDays(start,i);const iso=isoDate(d);
-    html+=`<div class="day-head ${iso===todayIso?'today':''}"><div class="dow">${DOW[d.getDay()]}</div><div class="dnum">${d.getDate()}</div></div>`;}
-  // linhas
+    html+=`<div class="day-head ${iso===todayIso?'today':''}" aria-hidden="true"><div class="dow">${DOW[d.getDay()]}</div><div class="dnum">${d.getDate()}</div></div>`;}
+  // linhas — cada célula é um botão (teclado + leitor de tela)
+  let primeira=true;
   times.forEach(t=>{
-    html+=`<div class="time-label">${t}</div>`;
+    html+=`<div class="time-label" aria-hidden="true">${t}</div>`;
     for(let i=0;i<7;i++){const d=addDays(start,i);const iso=isoDate(d);const key=iso+'|'+t;
       const exist=state.slotsExist.has(key);const busy=exist&&state.slotsExist.get(key);
       let cls='cell';if(busy)cls+=' busy';else if(exist){cls+=' free';state.cellSel.add(key);}
-      html+=`<div class="${cls}" data-key="${key}" data-busy="${busy?1:0}"></div>`;}
+      html+=`<button type="button" class="${cls}" data-key="${key}" data-busy="${busy?1:0}" tabindex="${primeira?0:-1}"`
+        +`${busy?' aria-disabled="true"':` aria-pressed="${exist?'true':'false'}"`} aria-label="${cellLabel(d,t,busy?'busy':exist?'free':'closed')}"></button>`;
+      primeira=false;}
   });
   grid.innerHTML=html;
   grid.querySelectorAll('.cell').forEach(c=>{
     c.addEventListener('click',()=>{
+      grid.querySelectorAll('.cell').forEach(x=>x.tabIndex=-1); c.tabIndex=0;
       if(c.dataset.busy==='1'){toast('Há consulta marcada neste horário.',true);return;}
-      const key=c.dataset.key;
-      if(c.classList.contains('free')){c.classList.remove('free');state.cellSel.delete(key);}
-      else{c.classList.add('free');state.cellSel.add(key);}
+      const key=c.dataset.key, d=new Date(key.split('|')[0]+'T00:00:00'), t=key.split('|')[1];
+      const livre=!c.classList.contains('free');
+      c.classList.toggle('free',livre); livre?state.cellSel.add(key):state.cellSel.delete(key);
+      c.setAttribute('aria-pressed',String(livre)); c.setAttribute('aria-label',cellLabel(d,t,livre?'free':'closed'));
     });
   });
 }
+const DOW_EXT=['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+const ESTADO_CELULA={free:'liberado',closed:'fechado',busy:'consulta marcada'};
+function cellLabel(d,t,estado){return `${DOW_EXT[d.getDay()]} ${d.getDate()}/${pad(d.getMonth()+1)}, ${t}: ${ESTADO_CELULA[estado]}`;}
+// setas movem entre as células (7 colunas); só uma célula fica na ordem de Tab
+$('#calGrid').addEventListener('keydown',e=>{
+  const c=e.target.closest('.cell'); if(!c) return;
+  const cells=[...$('#calGrid').querySelectorAll('.cell')], i=cells.indexOf(c);
+  const passo={ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7}[e.key];
+  let j=null;
+  if(passo!==undefined) j=i+passo;
+  else if(e.key==='Home') j=i-(i%7);
+  else if(e.key==='End') j=i-(i%7)+6;
+  if(j===null) return;
+  e.preventDefault();
+  if(j<0||j>=cells.length) return;
+  c.tabIndex=-1; cells[j].tabIndex=0; cells[j].focus();
+  cells[j].scrollIntoView({block:'nearest',inline:'nearest'});
+});
 $('#prevWeek').addEventListener('click',()=>{state.weekStart=addDays(state.weekStart,-7);renderWeek();});
 $('#nextWeek').addEventListener('click',()=>{state.weekStart=addDays(state.weekStart,7);renderWeek();});
 
@@ -845,6 +869,46 @@ async function loadHistorico(){
   }).join('');
 }
 
+// ===================== MODAIS: Esc fecha, foco preso, página não rola atrás =====================
+const Modal=(()=>{
+  let aberto=null, fechar=null, voltarFoco=null;
+  const FOCAVEIS='button:not([disabled]),[href],input:not([type="hidden"]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+  const visivel=el=>el.getClientRects().length>0&&getComputedStyle(el).visibility!=='hidden';
+  function open(el,onFechar){
+    voltarFoco=document.activeElement; aberto=el; fechar=onFechar;
+    el.classList.remove('hidden'); el.scrollTop=0;
+    document.documentElement.classList.add('modal-open');
+    const primeiro=el.querySelector('textarea,input:not([type="hidden"]),.tp-field,.dp-field')||el.querySelector(FOCAVEIS);
+    if(primeiro) primeiro.focus({preventScroll:true});
+  }
+  function close(el){
+    if(typeof Pop!=='undefined') Pop.closeAll();
+    el.classList.add('hidden');
+    if(aberto===el){
+      aberto=null; fechar=null;
+      document.documentElement.classList.remove('modal-open');
+      if(voltarFoco&&document.contains(voltarFoco)) voltarFoco.focus({preventScroll:true});
+    }
+  }
+  document.addEventListener('keydown',e=>{
+    if(!aberto||e.defaultPrevented) return;          // popover aberto trata as próprias teclas
+    if(e.key==='Escape'){
+      e.preventDefault();
+      // 1º Esc fecha o picker aberto; o seguinte fecha o modal
+      if(typeof Pop!=='undefined'&&Pop.isOpen()){ const c=Pop.current(); c.close(); c.field.focus(); }
+      else fechar&&fechar();
+      return;
+    }
+    if(e.key!=='Tab') return;
+    const els=[...aberto.querySelectorAll(FOCAVEIS)].filter(visivel);
+    if(!els.length) return;
+    const i=els.indexOf(document.activeElement);
+    if(e.shiftKey&&(i<=0)){ e.preventDefault(); els[els.length-1].focus(); }
+    else if(!e.shiftKey&&(i===-1||i===els.length-1)){ e.preventDefault(); els[0].focus(); }
+  });
+  return { open, close };
+})();
+
 // ===== MUDAR HORÁRIO (cascata) =====
 let agToMover=null, planoMover=[], planoHora=null, moverSeq=0;
 function abrirModalMover(id,info){
@@ -852,9 +916,13 @@ function abrirModalMover(id,info){
   $('#moverInfo').textContent=info;
   $('#moverHora').value='';$('#moverHora').dispatchEvent(new Event('tp-refresh'));
   $('#moverPreview').classList.add('hidden'); $('#moverPreview').innerHTML='';
-  $('#moverModal').classList.remove('hidden');
+  Modal.open($('#moverModal'),fecharMover);
 }
-$('#moverVoltar').addEventListener('click',()=>{$('#moverModal').classList.add('hidden');agToMover=null;});
+function fecharMover(){
+  if($('#moverConfirmar').disabled) return; // não fecha no meio da operação
+  Modal.close($('#moverModal')); agToMover=null; moverSeq++;
+}
+$('#moverVoltar').addEventListener('click',fecharMover);
 $('#moverHora').addEventListener('change', async ()=>{
   const nova=$('#moverHora').value;
   if(!nova||!agToMover) return;
@@ -889,7 +957,7 @@ $('#moverConfirmar').addEventListener('click', async ()=>{
     }catch(e){ gerros++; }
   }
   btn.disabled=false; btn.textContent='Aplicar mudança';
-  $('#moverModal').classList.add('hidden'); agToMover=null; planoMover=[]; planoHora=null;
+  Modal.close($('#moverModal')); agToMover=null; planoMover=[]; planoHora=null;
   toast(`Horários remanejados${gerros?` (${gerros} com erro no Google)`:' e atualizados no Google'}.`, gerros>0);
   loadConsultas();
 });
@@ -931,6 +999,10 @@ const Pop=(()=>{
   document.addEventListener('pointerdown',e=>{
     if(atual&&!atual.pop.contains(e.target)&&!atual.field.contains(e.target)) atual.close();
   },true);
+  // Esc fecha o picker aberto mesmo se o foco estiver fora dele
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'&&atual&&!e.defaultPrevented){ e.preventDefault(); const c=atual; c.close(); c.field.focus(); }
+  });
   return { open, close, isOpen:()=>!!atual, current:()=>atual, closeAll:()=>{ if(atual) atual.close(); } };
 })();
 
@@ -1007,7 +1079,10 @@ const TimePicker=(()=>{
       input.dispatchEvent(new Event('change',{bubbles:true}));
       refresh(); render(h!==null?'hcol':'mcol');
     }
-    function open(){ render('hcol'); Pop.open(pop,field,close); }
+    function open(){
+      render(); Pop.open(pop,field,close);   // foca só depois de visível (visibility:hidden não recebe foco)
+      const b=pop.querySelector('.hcol .tp-opt[tabindex="0"]'); if(b) b.focus({preventScroll:true});
+    }
     function close(){ Pop.close(pop,field); }
     field.addEventListener('click',()=>{ pop.classList.contains('show')?close():open(); });
     pop.addEventListener('keydown',e=>{
