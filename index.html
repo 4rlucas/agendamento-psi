@@ -301,11 +301,13 @@
   .dp-field.open{border-color:var(--sage);background:rgba(255,255,255,.85);box-shadow:0 0 0 4px var(--sage-tint)}
   .dp-field .cal-ico{width:17px;height:17px;flex:0 0 auto;stroke:var(--sage);opacity:.85}
   .dp-field .ph{color:var(--ink-soft)}
-  .dp-pop{position:absolute;top:calc(100% + 8px);left:0;z-index:70;width:300px;max-width:88vw;
-    background:rgba(255,250,247,.9);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);
-    border:1px solid var(--glass-brd);border-radius:var(--radius);box-shadow:0 20px 50px rgba(68,48,42,.22);
+  .dp-pop{position:absolute;top:calc(100% + 8px);left:0;z-index:200;width:300px;max-width:min(300px,88vw);
+    background:#fdf6f0;backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);
+    border:1px solid rgba(192,83,58,.25);border-radius:var(--radius);box-shadow:0 24px 60px rgba(68,48,42,.3);
     padding:16px;opacity:0;transform:translateY(-8px) scale(.98);pointer-events:none;
     transition:opacity .2s,transform .2s}
+  /* se estiver muito à direita, abre alinhado pela direita */
+  .dp-pop.right{left:auto;right:0}
   .dp-pop.show{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
   .dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
   .dp-head .mes{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:600;text-transform:capitalize}
@@ -328,6 +330,30 @@
   @keyframes pulse-sel{0%{box-shadow:0 0 0 0 rgba(192,83,58,.45)}100%{box-shadow:0 0 0 14px rgba(192,83,58,0)}}
   .slot.sel{animation:pulse-sel .5s ease-out}
   @media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+  /* ===== time picker próprio ===== */
+  .tp{position:relative}
+  .tp-field{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;
+    font-family:inherit;font-weight:400;font-size:16px;color:var(--ink);text-align:left;
+    background:rgba(255,255,255,.5);border:1px solid var(--glass-brd);border-radius:var(--radius-sm);
+    padding:14px 16px;transition:border-color .2s,background .2s,box-shadow .2s}
+  .tp-field:hover{background:rgba(255,255,255,.75)}
+  .tp-field.open{border-color:var(--sage);background:rgba(255,255,255,.85);box-shadow:0 0 0 4px var(--sage-tint)}
+  .tp-field .clock{width:17px;height:17px;flex:0 0 auto;stroke:var(--sage);opacity:.85}
+  .tp-field .ph{color:var(--ink-soft)}
+  .tp-pop{position:absolute;top:calc(100% + 8px);left:0;z-index:200;display:flex;gap:6px;
+    background:#fdf6f0;border:1px solid rgba(192,83,58,.25);border-radius:var(--radius);
+    box-shadow:0 24px 60px rgba(68,48,42,.3);padding:10px;opacity:0;transform:translateY(-8px) scale(.98);
+    pointer-events:none;transition:opacity .2s,transform .2s}
+  .tp-pop.right{left:auto;right:0}
+  .tp-pop.show{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+  .tp-col{display:flex;flex-direction:column;max-height:220px;overflow-y:auto;width:62px;scrollbar-width:thin}
+  .tp-col::-webkit-scrollbar{width:5px}.tp-col::-webkit-scrollbar-thumb{background:var(--sage-tint);border-radius:3px}
+  .tp-col .lbl{position:sticky;top:0;background:#fdf6f0;text-align:center;font-size:10px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink-soft);padding:4px 0;font-weight:500;z-index:1}
+  .tp-opt{border:none;background:none;cursor:pointer;font-family:inherit;font-size:15px;color:var(--ink);
+    padding:9px 0;text-align:center;border-radius:10px;transition:all .12s;font-variant-numeric:tabular-nums}
+  .tp-opt:hover{background:var(--sage-tint)}
+  .tp-opt.sel{background:var(--sage);color:#fff;font-weight:600}
 </style>
 </head>
 <body>
@@ -1054,7 +1080,7 @@ let agToMover=null, planoMover=[];
 function abrirModalMover(id,info){
   agToMover=id; planoMover=[];
   $('#moverInfo').textContent=info;
-  $('#moverHora').value='';
+  $('#moverHora').value='';$('#moverHora').dispatchEvent(new Event('tp-refresh'));
   $('#moverPreview').classList.add('hidden'); $('#moverPreview').innerHTML='';
   $('#moverModal').classList.remove('hidden');
 }
@@ -1209,6 +1235,12 @@ $('#btnCriarUsuario').addEventListener('click', async ()=>{
     function open(){
       if(input.value){const[y,m]=input.value.split('-').map(Number);view=new Date(y,m-1,1);}
       render(); pop.classList.add('show'); field.classList.add('open');
+      // se o popover sairia da tela pela direita, alinha pela direita
+      requestAnimationFrame(()=>{
+        pop.classList.remove('right');
+        const r=pop.getBoundingClientRect();
+        if(r.right>window.innerWidth-8) pop.classList.add('right');
+      });
     }
     function close(){ pop.classList.remove('show'); field.classList.remove('open'); }
     field.onclick=e=>{e.stopPropagation(); pop.classList.contains('show')?close():open();};
@@ -1222,6 +1254,63 @@ $('#btnCriarUsuario').addEventListener('click', async ()=>{
 
   function initAll(){ document.querySelectorAll('input[type="date"]').forEach(build); }
   // inicializa quando o DOM estiver pronto
+  if(document.readyState!=='loading') initAll(); else document.addEventListener('DOMContentLoaded',initAll);
+})();
+
+
+// ===== TIME PICKER PRÓPRIO =====
+(function(){
+  const p2=n=>String(n).padStart(2,'0');
+  function build(input){
+    const step = parseInt(input.getAttribute('step')||'0',10);
+    const minStep = step && step%60===0 ? step/60 : 5; // minutos de 5 em 5 (ou pelo step)
+    input.type='hidden';
+    const tp=document.createElement('div'); tp.className='tp';
+    const field=document.createElement('button'); field.type='button'; field.className='tp-field';
+    field.innerHTML=`<span class="txt ph">--:--</span>
+      <svg class="clock" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>`;
+    const pop=document.createElement('div'); pop.className='tp-pop';
+    input.parentNode.insertBefore(tp,input); tp.appendChild(input); tp.appendChild(field); tp.appendChild(pop);
+    const txt=field.querySelector('.txt');
+
+    function refresh(){
+      if(input.value){ txt.textContent=input.value.slice(0,5); txt.classList.remove('ph'); }
+      else{ txt.textContent='--:--'; txt.classList.add('ph'); }
+    }
+    function render(){
+      const cur=input.value?input.value.slice(0,5):'';
+      const [ch,cm]=cur?cur.split(':'):['',''];
+      let h='<div class="tp-col hcol"><span class="lbl">h</span>';
+      for(let i=0;i<24;i++){const v=p2(i);h+=`<button type="button" class="tp-opt${v===ch?' sel':''}" data-h="${v}">${v}</button>`;}
+      h+='</div><div class="tp-col mcol"><span class="lbl">min</span>';
+      for(let i=0;i<60;i+=minStep){const v=p2(i);h+=`<button type="button" class="tp-opt${v===cm?' sel':''}" data-m="${v}">${v}</button>`;}
+      h+='</div>';
+      pop.innerHTML=h;
+      pop.querySelectorAll('[data-h]').forEach(b=>b.onclick=e=>{e.stopPropagation();pick(b.dataset.h,null);});
+      pop.querySelectorAll('[data-m]').forEach(b=>b.onclick=e=>{e.stopPropagation();pick(null,b.dataset.m);});
+      // rola até o selecionado
+      requestAnimationFrame(()=>{
+        const sh=pop.querySelector('.hcol .sel'),sm=pop.querySelector('.mcol .sel');
+        if(sh)sh.scrollIntoView({block:'center'}); if(sm)sm.scrollIntoView({block:'center'});
+      });
+    }
+    function pick(h,m){
+      let [ch,cm]=(input.value?input.value.slice(0,5):'08:00').split(':');
+      if(h!==null)ch=h; if(m!==null)cm=m;
+      input.value=`${ch}:${cm}`;
+      input.dispatchEvent(new Event('change',{bubbles:true}));
+      refresh(); render();
+    }
+    function open(){ render(); pop.classList.add('show'); field.classList.add('open');
+      requestAnimationFrame(()=>{pop.classList.remove('right');const r=pop.getBoundingClientRect();if(r.right>window.innerWidth-8)pop.classList.add('right');});
+    }
+    function close(){ pop.classList.remove('show'); field.classList.remove('open'); }
+    field.onclick=e=>{e.stopPropagation(); pop.classList.contains('show')?close():open();};
+    document.addEventListener('click',e=>{if(!tp.contains(e.target))close();});
+    input.addEventListener('tp-refresh',refresh);
+    refresh();
+  }
+  function initAll(){ document.querySelectorAll('input[type="time"]').forEach(build); }
   if(document.readyState!=='loading') initAll(); else document.addEventListener('DOMContentLoaded',initAll);
 })();
 
