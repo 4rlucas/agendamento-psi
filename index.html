@@ -634,6 +634,11 @@ const state = { psicologo:null, data:null, hora:null, duracao:50 };
 
 // ===================== HELPERS =====================
 const $ = s => document.querySelector(s);
+// escapa texto vindo do banco/usuário antes de ir para innerHTML ou atributo
+const ESC_MAP={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ESC_MAP[c]);
+// data local AAAA-MM-DD (toISOString usa UTC e erra o dia depois das 21h em Brasília)
+const isoLocal = (d=new Date()) => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 function toast(msg, isErr=false){
   const t=$('#toast'); t.textContent=msg;
   t.className='toast show'+(isErr?' err':'');
@@ -715,8 +720,9 @@ $('#btnTrocarSenha').addEventListener('click', async ()=>{
   if(e1){ btn.disabled=false; btn.textContent='Salvar e entrar'; err.textContent='Erro: '+e1.message; return; }
   // marca o perfil como não-provisório
   const uid=(await sb.auth.getUser()).data.user.id;
-  await sb.from('perfis').update({ senha_provisoria:false }).eq('id', uid);
+  const { error:e2 } = await sb.from('perfis').update({ senha_provisoria:false }).eq('id', uid);
   btn.disabled=false; btn.textContent='Salvar e entrar';
+  if(e2){ err.textContent='Senha trocada, mas houve erro ao concluir: '+e2.message+'. Tente novamente.'; return; }
   $('#trocaScreen').classList.add('hidden');
   await enterApp(); // agora entra normal
 });
@@ -746,9 +752,9 @@ async function loadPsicologos(){
   if(!data.length){ box.innerHTML='<div class="empty">Nenhum profissional cadastrado.</div>'; return; }
   box.className='psi-grid';
   box.innerHTML = data.map(p=>`
-    <button class="psi" data-id="${p.id}" data-nome="${p.nome}">
-      <div class="nome">${p.nome}</div>
-      <div class="esp">${p.especialidade||'—'}</div>
+    <button class="psi" data-id="${esc(p.id)}" data-nome="${esc(p.nome)}">
+      <div class="nome">${esc(p.nome)}</div>
+      <div class="esp">${esc(p.especialidade||'—')}</div>
     </button>`).join('');
   box.querySelectorAll('.psi').forEach(el=>{
     el.addEventListener('click',()=>{
@@ -761,7 +767,7 @@ async function loadPsicologos(){
       // default: próxima data
       if(!$('#dataInput').value){
         const t=new Date(); t.setDate(t.getDate()+1);
-        $('#dataInput').value=t.toISOString().slice(0,10);$('#dataInput').dispatchEvent(new Event('dp-refresh'));
+        $('#dataInput').value=isoLocal(t);$('#dataInput').dispatchEvent(new Event('dp-refresh'));
       }
       $('#dataInput').focus();
       // reseta passos seguintes
@@ -774,18 +780,22 @@ async function loadPsicologos(){
 $('#btnVerHorarios').addEventListener('click', loadHorarios);
 $('#dataInput').addEventListener('change', ()=>resetFrom(3));
 
+let horariosSeq=0; // descarta respostas de buscas antigas
 async function loadHorarios(){
   const data=$('#dataInput').value;
   if(!data){ toast('Escolha uma data.',true); return; }
   if(!state.psicologo){ toast('Escolha um profissional.',true); return; }
+  resetFrom(3);
   state.data=data;
   $('#cardSlots').classList.remove('hidden');
   setStep(3);
   const box=$('#slotList'); box.className='loading'; box.textContent='Buscando horários…';
 
+  const seq=++horariosSeq;
   const { data:slots, error } = await sb.rpc('horarios_disponiveis',{
     p_psicologo_id: state.psicologo.id, p_data: data
   });
+  if(seq!==horariosSeq) return;
   if(error){ box.className='empty'; box.textContent='Erro ao buscar horários: '+error.message; return; }
   if(!slots.length){
     box.className='empty';
@@ -795,7 +805,7 @@ async function loadHorarios(){
   box.className='slots';
   box.innerHTML = slots.map(s=>{
     const hhmm=s.hora.slice(0,5);
-    return `<button class="slot" data-hora="${s.hora}" data-dur="${s.duracao_min}">${hhmm}</button>`;
+    return `<button class="slot" data-hora="${esc(s.hora)}" data-dur="${esc(s.duracao_min)}">${esc(hhmm)}</button>`;
   }).join('');
   box.querySelectorAll('.slot').forEach(el=>{
     el.addEventListener('click',()=>{
@@ -812,14 +822,19 @@ function showConfirm(){
   $('#cardConfirm').classList.remove('hidden');
   setStep(4);
   $('#summary').innerHTML=`
-    <div class="line"><span class="k">Profissional</span><b>${state.psicologo.nome}</b></div>
-    <div class="line"><span class="k">Data</span><b>${fmtData(state.data)}</b></div>
-    <div class="line"><span class="k">Horário</span><b>${state.hora.slice(0,5)} · ${state.duracao} min</b></div>`;
+    <div class="line"><span class="k">Profissional</span><b>${esc(state.psicologo.nome)}</b></div>
+    <div class="line"><span class="k">Data</span><b>${esc(fmtData(state.data))}</b></div>
+    <div class="line"><span class="k">Horário</span><b>${esc(state.hora.slice(0,5))} · ${esc(state.duracao)} min</b></div>`;
   $('#cardConfirm').scrollIntoView({behavior:'smooth',block:'nearest'});
+  // a seleção mudou: se a recorrência estiver ligada, recalcula as datas
+  if($('#recOn').checked) previewRecorrencia();
 }
 
 // ---- recorrência: toggle + preview ----
 let recDatas=[]; // datas livres previstas (as que serão criadas)
+let recKey=null;  // seleção para a qual recDatas foi calculado
+let recSeq=0;
+const recKeyAtual=()=>[state.psicologo?.id,state.data,state.hora,$('#recFreq').value,$('#recMeses').value].join('|');
 $('#recOn').addEventListener('change', async ()=>{
   const on=$('#recOn').checked;
   $('#recOpts').classList.toggle('hidden', !on);
@@ -829,15 +844,18 @@ $('#recFreq').addEventListener('change', previewRecorrencia);
 $('#recMeses').addEventListener('change', previewRecorrencia);
 
 async function previewRecorrencia(){
+  recDatas=[]; recKey=null;
   if(!state.psicologo||!state.data||!state.hora) return;
+  const key=recKeyAtual(), seq=++recSeq;
   const freq=+$('#recFreq').value, meses=+$('#recMeses').value;
+  const box=$('#recPreview'); box.classList.remove('hidden'); box.textContent='Calculando datas…';
   const { data, error } = await sb.rpc('verificar_recorrencia',{
     p_psicologo_id: state.psicologo.id, p_data_inicio: state.data,
     p_hora: state.hora, p_meses: meses, p_frequencia: freq
   });
-  const box=$('#recPreview'); box.classList.remove('hidden');
-  if(error){ box.innerHTML='Erro ao prever datas: '+error.message; recDatas=[]; return; }
-  recDatas = data.filter(d=>d.livre).map(d=>d.data);
+  if(seq!==recSeq) return; // chegou uma resposta mais nova
+  if(error){ box.textContent='Erro ao prever datas: '+error.message; return; }
+  recDatas = data.filter(d=>d.livre).map(d=>d.data); recKey=key;
   const ocupadas = data.filter(d=>!d.livre);
   const DIAS2=['dom','seg','ter','qua','qui','sex','sáb'];
   const fmt=iso=>{const[y,m,dd]=iso.split('-').map(Number);const dt=new Date(y,m-1,dd);
@@ -861,6 +879,10 @@ $('#btnConfirmar').addEventListener('click', async ()=>{
 
   // ===== RECORRENTE =====
   if($('#recOn').checked){
+    // garante que as datas correspondem à seleção atual (data/hora/frequência)
+    if(recKey!==recKeyAtual()) await previewRecorrencia();
+    if(recKey!==recKeyAtual()){ btn.disabled=false; btn.textContent='Confirmar e marcar';
+      toast('Não foi possível calcular as datas da recorrência. Tente novamente.',true); return; }
     if(!recDatas.length){ btn.disabled=false; btn.textContent='Confirmar e marcar';
       toast('Nenhuma data livre para marcar.',true); return; }
     const { data, error } = await sb.rpc('criar_recorrencia',{
@@ -931,7 +953,7 @@ async function marcarNoGoogle(agendamentoId){
 
 // ===================== RESET =====================
 function resetFrom(step){
-  if(step<=3){ $('#cardSlots').classList.add('hidden'); state.hora=null; }
+  if(step<=3){ $('#cardSlots').classList.add('hidden'); state.hora=null; recDatas=[]; recKey=null; recSeq++; }
   if(step<=4){ $('#cardConfirm').classList.add('hidden'); }
 }
 function resetAll(){
@@ -942,7 +964,7 @@ function resetAll(){
   $('#cardConfirm').classList.add('hidden');
   $('#cliNome').value=''; $('#cliTel').value=''; $('#cliEmail').value=''; $('#cliObs').value='';
   $('#recOn').checked=false; $('#recOpts').classList.add('hidden');
-  $('#recPreview').classList.add('hidden'); recDatas=[];
+  $('#recPreview').classList.add('hidden'); recDatas=[]; recKey=null; recSeq++;
   setStep(1);
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -963,8 +985,8 @@ async function initComparec(){
   // default: últimos 30 dias
   if(!$('#cmpIni').value){
     const hoje=new Date(), ini=new Date(); ini.setDate(ini.getDate()-30);
-    $('#cmpIni').value=ini.toISOString().slice(0,10);$('#cmpIni').dispatchEvent(new Event('dp-refresh'));
-    $('#cmpFim').value=hoje.toISOString().slice(0,10);$('#cmpFim').dispatchEvent(new Event('dp-refresh'));
+    $('#cmpIni').value=isoLocal(ini);$('#cmpIni').dispatchEvent(new Event('dp-refresh'));
+    $('#cmpFim').value=isoLocal(hoje);$('#cmpFim').dispatchEvent(new Event('dp-refresh'));
   }
   if(cmpInit) return; cmpInit=true;
   // popula o select de psicólogos
@@ -984,8 +1006,8 @@ $('#btnCmpBuscar').addEventListener('click', async ()=>{
   box.innerHTML=data.map(r=>{
     const [y,m,d]=r.data.split('-').map(Number); const dt=new Date(y,m-1,d);
     return `<div class="cmp-row">
-      <div class="when">${DIAS2[dt.getDay()]} ${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')} · ${r.hora.slice(0,5)}</div>
-      <div class="nome">${r.cliente_nome}</div>
+      <div class="when">${DIAS2[dt.getDay()]} ${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')} · ${esc(r.hora.slice(0,5))}</div>
+      <div class="nome">${esc(r.cliente_nome)}</div>
       <span class="st ${r.compareceu?'ok':'no'}">${r.compareceu?'Compareceu':'Faltou'}</span>
     </div>`;
   }).join('');
@@ -996,8 +1018,8 @@ let agInit=false, agToCancel=null;
 async function initAgendadas(){
   if(!$('#agIni').value){
     const hoje=new Date(), fim=new Date(); fim.setDate(fim.getDate()+30);
-    $('#agIni').value=hoje.toISOString().slice(0,10);$('#agIni').dispatchEvent(new Event('dp-refresh'));
-    $('#agFim').value=fim.toISOString().slice(0,10);$('#agFim').dispatchEvent(new Event('dp-refresh'));
+    $('#agIni').value=isoLocal(hoje);$('#agIni').dispatchEvent(new Event('dp-refresh'));
+    $('#agFim').value=isoLocal(fim);$('#agFim').dispatchEvent(new Event('dp-refresh'));
   }
   if(agInit) return; agInit=true;
   const{data}=await sb.from('psicologos').select('id,nome').eq('ativo',true).order('nome');
@@ -1016,17 +1038,18 @@ async function loadAgendadas(){
   box.className='';
   box.innerHTML=data.map(r=>{
     const [y,m,d]=r.data.split('-').map(Number); const dt=new Date(y,m-1,d);
-    return `<div class="ag-row" data-id="${r.id}">
-      <div class="when">${DIAS2[dt.getDay()]} ${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')} · ${r.hora.slice(0,5)}</div>
+    const quando=`${DIAS2[dt.getDay()]} ${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')}`, h=r.hora.slice(0,5);
+    return `<div class="ag-row" data-id="${esc(r.id)}">
+      <div class="when">${quando} · ${esc(h)}</div>
       <div class="info">
-        <div class="nome">${r.cliente_nome}</div>
-        <div class="meta">${r.psicologo_nome}${r.cliente_telefone?' · '+r.cliente_telefone:''}</div>
+        <div class="nome">${esc(r.cliente_nome)}</div>
+        <div class="meta">${esc(r.psicologo_nome)}${r.cliente_telefone?' · '+esc(r.cliente_telefone):''}</div>
       </div>
       <div class="ag-acoes">
-        <button class="btn-mover-sm" data-id="${r.id}"
-          data-info="${r.cliente_nome} · ${DIAS2[dt.getDay()]} ${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')} ${r.hora.slice(0,5)}">Mudar horário</button>
-        <button class="btn-cancel-sm" data-id="${r.id}"
-          data-info="${r.cliente_nome} · ${DIAS2[dt.getDay()]} ${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')} ${r.hora.slice(0,5)} · ${r.psicologo_nome}">Cancelar</button>
+        <button class="btn-mover-sm" data-id="${esc(r.id)}"
+          data-info="${esc(`${r.cliente_nome} · ${quando} ${h}`)}">Mudar horário</button>
+        <button class="btn-cancel-sm" data-id="${esc(r.id)}"
+          data-info="${esc(`${r.cliente_nome} · ${quando} ${h} · ${r.psicologo_nome}`)}">Cancelar</button>
       </div>
     </div>`;
   }).join('');
@@ -1051,10 +1074,15 @@ $('#cancelConfirmar').addEventListener('click', async ()=>{
   if(!motivo){ toast('Informe o motivo do cancelamento.',true); return; }
   const btn=$('#cancelConfirmar'); btn.disabled=true; btn.textContent='Cancelando…';
 
-  // 1) registra o motivo
+  // 1) registra o motivo — se falhar, para aqui (não mexe no Google)
   const { error:e1 } = await sb.rpc('registrar_cancelamento',{
     p_agendamento_id:agToCancel, p_motivo:motivo
   });
+  if(e1){
+    btn.disabled=false; btn.textContent='Cancelar consulta';
+    toast('Erro ao registrar cancelamento: '+e1.message+'. Nada foi alterado.', true);
+    return; // modal continua aberto para tentar de novo
+  }
   // 2) remove do Google + marca status cancelado (Edge Function)
   let gerr=null;
   try{
@@ -1067,8 +1095,7 @@ $('#cancelConfirmar').addEventListener('click', async ()=>{
   btn.disabled=false; btn.textContent='Cancelar consulta';
   $('#cancelModal').classList.add('hidden');
 
-  if(e1){ toast('Erro ao registrar cancelamento: '+e1.message, true); }
-  else if(gerr){ toast('Consulta cancelada, mas houve erro ao remover do Google.', true); console.error(gerr); }
+  if(gerr){ toast('Consulta cancelada, mas houve erro ao remover do Google.', true); console.error(gerr); }
   else { toast('Consulta cancelada e removida do Google Agenda.'); }
 
   agToCancel=null;
@@ -1076,9 +1103,9 @@ $('#cancelConfirmar').addEventListener('click', async ()=>{
 });
 
 // ===================== MUDAR HORÁRIO (cascata) =====================
-let agToMover=null, planoMover=[];
+let agToMover=null, planoMover=[], planoHora=null, moverSeq=0;
 function abrirModalMover(id,info){
-  agToMover=id; planoMover=[];
+  agToMover=id; planoMover=[]; planoHora=null; moverSeq++;
   $('#moverInfo').textContent=info;
   $('#moverHora').value='';$('#moverHora').dispatchEvent(new Event('tp-refresh'));
   $('#moverPreview').classList.add('hidden'); $('#moverPreview').innerHTML='';
@@ -1090,18 +1117,21 @@ $('#moverVoltar').addEventListener('click',()=>{$('#moverModal').classList.add('
 $('#moverHora').addEventListener('change', async ()=>{
   const nova=$('#moverHora').value;
   if(!nova||!agToMover){ return; }
-  const box=$('#moverPreview'); box.classList.remove('hidden'); box.innerHTML='Calculando…';
+  // cada mudança invalida a prévia anterior; só a resposta da última consulta é exibida
+  const seq=++moverSeq; planoMover=[]; planoHora=null;
+  const box=$('#moverPreview'); box.classList.remove('hidden'); box.textContent='Calculando…';
   const { data, error } = await sb.rpc('simular_remanejo',{
     p_agendamento_id:agToMover, p_nova_hora:nova
   });
-  if(error){ box.innerHTML='Erro: '+error.message; planoMover=[]; return; }
-  planoMover = (data||[]).filter(p=>p.acao==='mover');
+  if(seq!==moverSeq || nova!==$('#moverHora').value) return; // resposta velha
+  if(error){ box.textContent='Erro: '+error.message; return; }
+  planoMover = (data||[]).filter(p=>p.acao==='mover'); planoHora=nova;
   const fora = (data||[]).filter(p=>p.acao==='fora');
-  if(!data || !data.length){ box.innerHTML='Nada a mover.'; return; }
+  if(!data || !data.length){ box.textContent='Nada a mover.'; return; }
   const linhas = (data||[]).map(p=>{
-    const h=p.hora_nova.slice(0,5), a=p.hora_antiga.slice(0,5);
-    if(p.acao==='fora') return `<span class="conf">⚠ ${p.cliente_nome}: ${a} → ficaria fora do expediente (não será movido)</span>`;
-    return `${p.cliente_nome}: ${a} → <b>${h}</b>`;
+    const h=esc(p.hora_nova.slice(0,5)), a=esc(p.hora_antiga.slice(0,5)), n=esc(p.cliente_nome);
+    if(p.acao==='fora') return `<span class="conf">⚠ ${n}: ${a} → ficaria fora do expediente (não será movido)</span>`;
+    return `${n}: ${a} → <b>${h}</b>`;
   });
   box.innerHTML = linhas.join('<br>') + (fora.length
     ? `<br><span class="conf">${fora.length} sessão(ões) não cabem e você precisará remarcar manualmente.</span>` : '');
@@ -1110,6 +1140,7 @@ $('#moverHora').addEventListener('change', async ()=>{
 $('#moverConfirmar').addEventListener('click', async ()=>{
   const nova=$('#moverHora').value;
   if(!nova||!agToMover){ toast('Escolha o novo horário.',true); return; }
+  if(planoHora!==nova){ toast('Aguarde a prévia do novo horário.',true); return; }
   if(!planoMover.length){ toast('Nada a mover neste horário.',true); return; }
   const btn=$('#moverConfirmar'); btn.disabled=true; btn.textContent='Aplicando…';
 
@@ -1132,7 +1163,7 @@ $('#moverConfirmar').addEventListener('click', async ()=>{
   }
 
   btn.disabled=false; btn.textContent='Aplicar mudança';
-  $('#moverModal').classList.add('hidden'); agToMover=null; planoMover=[];
+  $('#moverModal').classList.add('hidden'); agToMover=null; planoMover=[]; planoHora=null;
   toast(`Horários remanejados${gerros?` (${gerros} evento(s) com erro no Google)`:' e atualizados no Google'}.`, gerros>0);
   loadAgendadas();
 });

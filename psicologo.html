@@ -457,6 +457,9 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON,{
 
 const $=s=>document.querySelector(s);
 const $$=s=>document.querySelectorAll(s);
+// escapa texto vindo do banco/usuário antes de ir para innerHTML ou atributo
+const ESC_MAP={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>ESC_MAP[c]);
 const DOW=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 
@@ -505,8 +508,9 @@ $('#btnTrocarSenha').addEventListener('click', async ()=>{
   const { error:e1 } = await sb.auth.updateUser({ password: s1 });
   if(e1){ btn.disabled=false; btn.textContent='Salvar e entrar'; err.textContent='Erro: '+e1.message; return; }
   const uid=(await sb.auth.getUser()).data.user.id;
-  await sb.from('perfis').update({ senha_provisoria:false }).eq('id', uid);
+  const { error:e2 } = await sb.from('perfis').update({ senha_provisoria:false }).eq('id', uid);
   btn.disabled=false; btn.textContent='Salvar e entrar';
+  if(e2){ err.textContent='Senha trocada, mas houve erro ao concluir: '+e2.message+'. Tente novamente.'; return; }
   $('#trocaScreen').classList.add('hidden');
   await enterApp();
 });
@@ -598,14 +602,21 @@ function gradeSlots(){
 }
 
 // ===== CALENDÁRIO (liberar agenda) =====
+let weekSeq=0; // só a última semana pedida é desenhada
 async function renderWeek(){
   const start=state.weekStart, end=addDays(start,6);
-  $('#weekLabel').textContent=`${start.getDate()} ${MES[start.getMonth()]} – ${end.getDate()} ${MES[end.getMonth()]}`;
-  const grid=$('#calGrid'); const times=gradeSlots(); const todayIso=isoDate(new Date());
+  const label=`${start.getDate()} ${MES[start.getMonth()]} – ${end.getDate()} ${MES[end.getMonth()]}`;
+  $('#weekLabel').textContent=label;
+  const grid=$('#calGrid'); const todayIso=isoDate(new Date());
+  const seq=++weekSeq;
+  grid.setAttribute('aria-busy','true'); grid.style.opacity='.5';
 
   // carrega slots já liberados/ocupados da semana
-  state.slotsExist.clear(); state.cellSel.clear();
   const{data:slots,error}=await sb.rpc('meus_slots',{p_inicio:isoDate(start),p_fim:isoDate(end)});
+  if(seq!==weekSeq) return; // usuário já navegou para outra semana
+  grid.removeAttribute('aria-busy'); grid.style.opacity='';
+  const times=gradeSlots();
+  state.slotsExist.clear(); state.cellSel.clear();
   if(error){toast('Erro ao carregar semana: '+error.message,true);}
   (slots||[]).forEach(s=>{state.slotsExist.set(isoDate(new Date(s.data+'T00:00:00'))+'|'+hhmm(s.hora),s.ocupado);});
 
@@ -636,6 +647,7 @@ $('#nextWeek').addEventListener('click',()=>{state.weekStart=addDays(state.weekS
 
 $('#btnSalvarSemana').addEventListener('click',async()=>{
   // diferença: adicionar novos (na seleção, sem existir) e remover os que existiam e foram tirados
+  if($('#calGrid').hasAttribute('aria-busy')){toast('Aguarde a semana terminar de carregar.',true);return;}
   const toAdd=[], toRemove=[];
   const start=state.weekStart;
   // percorre todos os slots possíveis da semana
@@ -659,31 +671,35 @@ $('#btnSalvarSemana').addEventListener('click',async()=>{
 // ===== CONSULTAS =====
 $('#prevWeekC').addEventListener('click',()=>{state.weekStartC=addDays(state.weekStartC,-7);loadConsultas();});
 $('#nextWeekC').addEventListener('click',()=>{state.weekStartC=addDays(state.weekStartC,7);loadConsultas();});
+let consultasSeq=0;
 async function loadConsultas(){
   const start=state.weekStartC,end=addDays(start,6);
   $('#weekLabelC').textContent=`${start.getDate()} ${MES[start.getMonth()]} – ${end.getDate()} ${MES[end.getMonth()]}`;
   const box=$('#apptList');box.className='loading';box.textContent='Carregando…';
+  const seq=++consultasSeq;
   const{data,error}=await sb.from('agendamentos')
     .select('id,data,hora,cliente_nome,cliente_telefone,observacoes,status')
     .eq('psicologo_id',state.psicologoId)
     .gte('data',isoDate(start)).lte('data',isoDate(end))
     .neq('status','cancelado')
     .order('data').order('hora');
+  if(seq!==consultasSeq) return;
   if(error){box.className='empty';box.textContent='Erro: '+error.message;return;}
   if(!data.length){box.className='empty';box.textContent='Nenhuma consulta marcada nesta semana.';return;}
   box.className='';
   box.innerHTML=data.map(a=>{
     const d=new Date(a.data+'T00:00:00');
+    const quando=`${DOW[d.getDay()]} ${d.getDate()}/${pad(d.getMonth()+1)}`;
     return `<div class="appt">
-      <div class="when"><div class="d">${DOW[d.getDay()]} ${d.getDate()}/${pad(d.getMonth()+1)}</div>
-        <div class="h">${hhmm(a.hora)}</div></div>
+      <div class="when"><div class="d">${quando}</div>
+        <div class="h">${esc(hhmm(a.hora))}</div></div>
       <div class="body">
-        <div class="pac">${a.cliente_nome}</div>
-        ${a.cliente_telefone?`<div class="tel">${a.cliente_telefone}</div>`:''}
-        ${a.observacoes?`<div class="obs">${a.observacoes}</div>`:'<div class="obs" style="opacity:.5">Sem observações</div>'}
+        <div class="pac">${esc(a.cliente_nome)}</div>
+        ${a.cliente_telefone?`<div class="tel">${esc(a.cliente_telefone)}</div>`:''}
+        ${a.observacoes?`<div class="obs">${esc(a.observacoes)}</div>`:'<div class="obs" style="opacity:.5">Sem observações</div>'}
         <div class="appt-foot">
-          <span class="tag ${a.status}">${a.status==='realizada'?'Realizada':'Confirmada'}</span>
-          ${a.status==='confirmado'?`<button class="btn-mover-sm" data-id="${a.id}" data-info="${a.cliente_nome} · ${DOW[d.getDay()]} ${d.getDate()}/${pad(d.getMonth()+1)} ${hhmm(a.hora)}">Mudar horário</button>`:''}
+          <span class="tag ${a.status==='realizada'?'realizada':'confirmado'}">${a.status==='realizada'?'Realizada':'Confirmada'}</span>
+          ${a.status==='confirmado'?`<button class="btn-mover-sm" data-id="${esc(a.id)}" data-info="${esc(`${a.cliente_nome} · ${quando} ${hhmm(a.hora)}`)}">Mudar horário</button>`:''}
         </div>
       </div></div>`;
   }).join('');
@@ -694,22 +710,28 @@ async function loadConsultas(){
 
 // ===== FEEDBACK / EVOLUÇÃO =====
 async function fetchPendentes(){
-  const hojeIso=isoDate(new Date());
-  // consultas confirmadas com data <= hoje, sem evolução registrada
-  const{data:ags,error}=await sb.from('agendamentos')
-    .select('id,data,hora,cliente_nome,status')
+  const agora=new Date(), hojeIso=isoDate(agora);
+  // consultas com data <= hoje (o banco filtra pela data)…
+  const{data:todas,error}=await sb.from('agendamentos')
+    .select('id,data,hora,duracao_min,cliente_nome,status')
     .eq('psicologo_id',state.psicologoId)
     .lte('data',hojeIso)
     .neq('status','cancelado')
     .order('data',{ascending:false}).order('hora',{ascending:false});
   if(error)return{err:error};
-  const ids=(ags||[]).map(a=>a.id);
+  // …e aqui fica só quem já TERMINOU (data + hora + duração <= agora)
+  const ags=(todas||[]).filter(a=>{
+    const [y,m,d]=a.data.split('-').map(Number), [hh,mm]=a.hora.split(':').map(Number);
+    const fim=new Date(y,m-1,d,hh,mm+(a.duracao_min||50));
+    return fim<=agora;
+  });
+  const ids=ags.map(a=>a.id);
   let comEvo=new Set();
   if(ids.length){
     const{data:evos}=await sb.from('sessoes_evolucao').select('agendamento_id').in('agendamento_id',ids);
     (evos||[]).forEach(e=>comEvo.add(e.agendamento_id));
   }
-  return{pend:(ags||[]).filter(a=>!comEvo.has(a.id))};
+  return{pend:ags.filter(a=>!comEvo.has(a.id))};
 }
 async function loadFeedbackCount(){
   const r=await fetchPendentes();if(r.err)return;
@@ -724,10 +746,10 @@ async function loadFeedback(){
   box.className='';
   box.innerHTML=r.pend.map(a=>{
     const d=new Date(a.data+'T00:00:00');
-    return `<div class="fb-item" data-id="${a.id}">
+    return `<div class="fb-item" data-id="${esc(a.id)}">
       <div class="fb-head">
-        <span class="pac">${a.cliente_nome}</span>
-        <span class="meta">${DOW[d.getDay()]} ${d.getDate()}/${pad(d.getMonth()+1)} · ${hhmm(a.hora)}</span>
+        <span class="pac">${esc(a.cliente_nome)}</span>
+        <span class="meta">${DOW[d.getDay()]} ${d.getDate()}/${pad(d.getMonth()+1)} · ${esc(hhmm(a.hora))}</span>
       </div>
       <div class="fb-controls">
         <button class="chip chip-ok sel-ok" data-v="1">Compareceu</button>
@@ -752,10 +774,13 @@ async function salvarEvolucao(item){
   const{error:e1}=await sb.from('sessoes_evolucao').insert({
     agendamento_id:id,psicologo_id:state.psicologoId,compareceu,evolucao:evo||null
   });
-  if(e1){b.disabled=false;b.textContent='Salvar registro';toast('Erro: '+e1.message,true);return;}
+  if(e1){b.disabled=false;b.textContent='Salvar registro';toast('Erro ao salvar: '+e1.message,true);return;}
   // marca o agendamento como realizado
-  await sb.from('agendamentos').update({status:'realizada'}).eq('id',id);
-  toast('Registro salvo.');
+  const{error:e2}=await sb.from('agendamentos').update({status:'realizada'}).eq('id',id);
+  if(e2){
+    // a evolução foi gravada (sai da lista de pendentes), mas o status não mudou: avisa de forma honesta
+    toast('Evolução salva, mas não foi possível marcar a consulta como realizada: '+e2.message,true);
+  }else toast('Registro salvo.');
   item.remove(); loadFeedbackCount();
   if(!$('#fbList').children.length){$('#fbList').className='empty';$('#fbList').textContent='Nenhuma sessão aguardando registro. 🌿';}
 }
@@ -781,20 +806,20 @@ async function loadHistorico(){
     const quando=d?`${DOW[d.getDay()]} ${d.getDate()}/${pad(d.getMonth()+1)}/${d.getFullYear()} · ${hhmm(a.hora)}`:'—';
     return `<div class="fb-item">
       <div class="fb-head">
-        <span class="pac">${a.cliente_nome||'Paciente'}</span>
-        <span class="meta">${quando}</span>
+        <span class="pac">${esc(a.cliente_nome||'Paciente')}</span>
+        <span class="meta">${esc(quando)}</span>
       </div>
       <span class="tag ${e.compareceu?'confirmado':'realizada'}" style="margin-bottom:8px">
         ${e.compareceu?'Compareceu':'Faltou'}</span>
-      <div class="obs" style="margin-top:6px;white-space:pre-wrap">${e.evolucao?e.evolucao:'<em style="opacity:.5">Sem anotações</em>'}</div>
+      <div class="obs" style="margin-top:6px;white-space:pre-wrap">${e.evolucao?esc(e.evolucao):'<em style="opacity:.5">Sem anotações</em>'}</div>
     </div>`;
   }).join('');
 }
 
 // ===== MUDAR HORÁRIO (cascata) =====
-let agToMover=null, planoMover=[];
+let agToMover=null, planoMover=[], planoHora=null, moverSeq=0;
 function abrirModalMover(id,info){
-  agToMover=id; planoMover=[];
+  agToMover=id; planoMover=[]; planoHora=null; moverSeq++;
   $('#moverInfo').textContent=info;
   $('#moverHora').value='';$('#moverHora').dispatchEvent(new Event('tp-refresh'));
   $('#moverPreview').classList.add('hidden'); $('#moverPreview').innerHTML='';
@@ -804,22 +829,26 @@ $('#moverVoltar').addEventListener('click',()=>{$('#moverModal').classList.add('
 $('#moverHora').addEventListener('change', async ()=>{
   const nova=$('#moverHora').value;
   if(!nova||!agToMover) return;
-  const box=$('#moverPreview'); box.classList.remove('hidden'); box.innerHTML='Calculando…';
+  // cada mudança invalida a prévia anterior; só a resposta da última consulta é exibida
+  const seq=++moverSeq; planoMover=[]; planoHora=null;
+  const box=$('#moverPreview'); box.classList.remove('hidden'); box.textContent='Calculando…';
   const { data, error } = await sb.rpc('simular_remanejo',{p_agendamento_id:agToMover,p_nova_hora:nova});
-  if(error){ box.innerHTML='Erro: '+error.message; planoMover=[]; return; }
-  planoMover=(data||[]).filter(p=>p.acao==='mover');
+  if(seq!==moverSeq || nova!==$('#moverHora').value) return; // resposta velha
+  if(error){ box.textContent='Erro: '+error.message; return; }
+  planoMover=(data||[]).filter(p=>p.acao==='mover'); planoHora=nova;
   const fora=(data||[]).filter(p=>p.acao==='fora');
-  if(!data||!data.length){ box.innerHTML='Nada a mover.'; return; }
+  if(!data||!data.length){ box.textContent='Nada a mover.'; return; }
   box.innerHTML=(data||[]).map(p=>{
-    const h=p.hora_nova.slice(0,5),a=p.hora_antiga.slice(0,5);
+    const h=esc(p.hora_nova.slice(0,5)),a=esc(p.hora_antiga.slice(0,5)),n=esc(p.cliente_nome);
     return p.acao==='fora'
-      ? `<span class="conf">⚠ ${p.cliente_nome}: ${a} → ficaria fora do expediente (não será movido)</span>`
-      : `${p.cliente_nome}: ${a} → <b>${h}</b>`;
+      ? `<span class="conf">⚠ ${n}: ${a} → ficaria fora do expediente (não será movido)</span>`
+      : `${n}: ${a} → <b>${h}</b>`;
   }).join('<br>') + (fora.length?`<br><span class="conf">${fora.length} sessão(ões) não cabem; remarque manualmente.</span>`:'');
 });
 $('#moverConfirmar').addEventListener('click', async ()=>{
   const nova=$('#moverHora').value;
   if(!nova||!agToMover){ toast('Escolha o novo horário.',true); return; }
+  if(planoHora!==nova){ toast('Aguarde a prévia do novo horário.',true); return; }
   if(!planoMover.length){ toast('Nada a mover neste horário.',true); return; }
   const btn=$('#moverConfirmar'); btn.disabled=true; btn.textContent='Aplicando…';
   const { data, error } = await sb.rpc('aplicar_remanejo',{p_agendamento_id:agToMover,p_nova_hora:nova});
@@ -831,7 +860,7 @@ $('#moverConfirmar').addEventListener('click', async ()=>{
     }catch(e){ gerros++; }
   }
   btn.disabled=false; btn.textContent='Aplicar mudança';
-  $('#moverModal').classList.add('hidden'); agToMover=null; planoMover=[];
+  $('#moverModal').classList.add('hidden'); agToMover=null; planoMover=[]; planoHora=null;
   toast(`Horários remanejados${gerros?` (${gerros} com erro no Google)`:' e atualizados no Google'}.`, gerros>0);
   loadConsultas();
 });
