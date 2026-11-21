@@ -6,19 +6,18 @@
 <title>Agenda · Profissional</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg:#f5e4da; --surface:rgba(255,250,247,.55); --surface-solid:#fbf3ee;
-    --ink:#44302a; --ink-soft:#a07d72;
+    --ink:#44302a; --ink-soft:#7d5a4e;
     --line:rgba(255,255,255,.6); --line-solid:#e7d4c8;
     --sage:#c0533a; --sage-deep:#9a4026; --sage-tint:rgba(192,83,58,.14);
     --amber:#d98a86; --amber-tint:#f7e2de; --danger:#b4453a; --danger-tint:#f4e0de;
     --radius:24px; --radius-sm:16px; --glass-brd:rgba(255,255,255,.6);
     --shadow:0 10px 44px rgba(68,48,42,.1);
   }
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500;600&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%}
   body{font-family:'Jost','Inter',system-ui,sans-serif;font-weight:300;background:var(--bg);color:var(--ink);
@@ -39,10 +38,12 @@
     color:var(--ink);border-bottom:1px solid var(--glass-brd);padding:16px 0;position:sticky;top:0;z-index:20;
     padding-top:calc(18px + env(safe-area-inset-top,0px))}
   header .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px}
-  .brand{display:flex;align-items:center;gap:11px;font-weight:600;font-size:21px}
-  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--sage);
-    box-shadow:0 0 0 4px rgba(192,83,58,.18)}
-  .brand small{display:block;font-weight:300;font-size:12px;opacity:.7;letter-spacing:.04em;font-family:'Jost',sans-serif;text-transform:uppercase}
+  .brand{display:flex;align-items:center;gap:14px}
+  .brand .logo{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;letter-spacing:.01em;color:var(--ink);line-height:1}
+  .brand .logo i{font-style:italic;font-weight:500;color:var(--sage)}
+  .brand .role{font-family:'Jost',sans-serif;font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--sage-deep);background:var(--sage-tint);border:1px solid rgba(192,83,58,.2);
+    padding:4px 11px;border-radius:40px;align-self:center}
   .who{display:flex;align-items:center;gap:14px;font-size:13px}
   .who button{background:rgba(255,255,255,.4);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
     color:var(--ink);border:1px solid var(--glass-brd);padding:9px 18px;border-radius:40px;font-size:12px;
@@ -62,6 +63,9 @@
     transition:border-color .2s,box-shadow .2s,background .2s}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--sage);background:rgba(255,255,255,.8);
     box-shadow:0 0 0 4px var(--sage-tint)}
+  select{appearance:none;-webkit-appearance:none;-moz-appearance:none;cursor:pointer;padding-right:44px;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23c0533a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 16px center}
   .field{margin-bottom:18px}
   .btn{font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;border:none;letter-spacing:.1em;text-transform:uppercase;
     border-radius:40px;padding:15px 28px;transition:transform .15s,background .2s,box-shadow .2s,opacity .15s}
@@ -140,7 +144,7 @@
   .appt:last-child{border-bottom:none}
   .appt .when{flex:0 0 auto;text-align:center;min-width:64px}
   .appt .when .d{font-size:12px;color:var(--ink-soft);text-transform:uppercase}
-  .appt .when .h{font-size:18px;font-weight:600;font-family:'Fraunces',serif}
+  .appt .when .h{font-size:20px;font-weight:600;font-family:'Cormorant Garamond',serif}
   .appt .body{flex:1}
   .appt .pac{font-weight:600;font-size:15px}
   .appt .obs{font-size:13px;color:var(--ink-soft);margin-top:3px}
@@ -169,12 +173,13 @@
   .loading{color:var(--ink-soft);font-size:14px;padding:10px 0}
   .hidden{display:none!important}
 
-  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
-    background:var(--sage-deep);color:#fff;padding:13px 22px;border-radius:11px;font-size:14px;
-    box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;
-    z-index:50;max-width:90vw}
-  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  .toast.err{background:var(--danger)}
+  .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(24px) scale(.96);
+    background:var(--sage-deep);color:#fff;padding:14px 26px;border-radius:40px;font-size:14px;font-weight:400;
+    box-shadow:0 12px 36px rgba(154,64,38,.4);opacity:0;pointer-events:none;
+    transition:opacity .3s,transform .35s cubic-bezier(.2,.9,.3,1.3);z-index:80;max-width:90vw;
+    padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}
+  .toast.err{background:var(--danger);box-shadow:0 12px 36px rgba(180,69,58,.4)}
 
   /* dica de rolagem do calendário (aparece no mobile) */
   .cal-scroll-hint{display:none;font-size:12px;color:var(--ink-soft);margin-bottom:8px;
@@ -254,6 +259,11 @@
   @media (prefers-reduced-motion: reduce){
     *{animation-duration:.01ms!important;transition-duration:.01ms!important}
   }
+  /* micro-interações extras */
+  .slot:active,.psi:active,.btn:active{transform:scale(.97)}
+  @keyframes pulse-sel{0%{box-shadow:0 0 0 0 rgba(192,83,58,.45)}100%{box-shadow:0 0 0 14px rgba(192,83,58,0)}}
+  .slot.sel{animation:pulse-sel .5s ease-out}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 </head>
 <body>
@@ -289,8 +299,8 @@
 <!-- APP -->
 <div id="app" class="hidden">
   <header><div class="wrap">
-    <div class="brand"><span class="dot"></span>
-      <div>Agenda<small id="userLabel">Profissional</small></div></div>
+    <div class="brand"><span class="logo">Cuidar <i>é amar</i></span>
+      <span class="role" id="userLabel">Profissional</span></div>
     <div class="who"><button id="btnLogout">Sair</button></div>
   </div></header>
 
