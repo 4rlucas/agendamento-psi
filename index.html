@@ -23,6 +23,7 @@
     --amber:#d98a86;       /* rosa queimado */
     --danger:#b4453a;
     --danger-text:#a23d33;  /* vermelho para TEXTO: ≥4.5 sobre os tints */
+    --danger-pill:rgba(180,69,58,.13); /* fundo de selo/botão pequeno vermelho: visível sobre o vidro */
     --danger-tint:#f4e0de;
     --radius:24px;
     --radius-sm:16px;
@@ -235,7 +236,7 @@
   .cmp-row .nome{flex:1;font-weight:500}
   .cmp-row .st{font-size:12px;font-weight:600;padding:3px 11px;border-radius:8px}
   .st.ok{background:var(--sage-tint);color:var(--sage-deep)}
-  .st.no{background:var(--danger-tint,#f4e0de);color:var(--danger-text)}
+  .st.no{background:var(--danger-pill);color:var(--danger-text)}
 
   /* modal */
   /* fundo do modal rola quando o conteúdo não cabe (tela baixa / celular deitado) */
@@ -259,7 +260,8 @@
   .ag-row .info{flex:1}
   .ag-row .info .nome{font-weight:500}
   .ag-row .info .meta{font-size:12px;color:var(--ink-soft)}
-  .btn-cancel-sm{background:var(--danger-tint,#f4e0de);color:var(--danger-text);border:none;
+  .nw{white-space:nowrap}
+  .btn-cancel-sm{background:var(--danger-pill);color:var(--danger-text);border:none;
     border-radius:8px;padding:7px 13px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
   .btn-cancel-sm:hover{background:var(--danger);color:#fff}
   .ag-acoes{display:flex;gap:8px;flex-wrap:wrap}
@@ -291,10 +293,13 @@
     .confirm-grid{grid-template-columns:1fr}
     /* linhas de lista quebram melhor */
     .cmp-row,.ag-row{flex-wrap:wrap;gap:6px 12px}
-    .ag-row .btn-cancel-sm{padding:10px 16px}
+    .ag-row .btn-cancel-sm,.ag-row .btn-mover-sm{padding:10px 16px;min-height:40px}
   }
   @media (max-width:480px){
     .page-sub{font-size:13px}
+    .steps{flex-wrap:nowrap}
+    .step{padding-right:12px}
+    .step:not(.active){font-size:0;gap:0}
     .card{padding:18px}
     .slots{grid-template-columns:repeat(auto-fill,minmax(72px,1fr))}
     /* botões de ação empilham em largura total (primário em cima) */
@@ -331,8 +336,8 @@
   .dp-field .cal-ico{width:17px;height:17px;flex:0 0 auto;stroke:var(--sage);opacity:.85}
   .dp-field .ph{color:var(--ink-soft)}
   /* popover fica no <body> (position:fixed) — top/left calculados pelo JS (Pop.place) */
-  .dp-pop{position:fixed;top:0;left:0;z-index:300;width:300px;max-width:calc(100vw - 16px);
-    max-height:calc(100vh - 16px);overflow-y:auto;overscroll-behavior:contain;
+  .dp-pop{position:fixed;top:0;left:0;z-index:300;width:320px;max-width:calc(100vw - 16px);
+    max-height:calc(100vh - 16px);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;
     background:#fdf6f0;
     border:1px solid rgba(192,83,58,.25);border-radius:var(--radius);box-shadow:0 24px 60px rgba(68,48,42,.3);
     padding:16px;opacity:0;visibility:hidden;transform:translateY(-8px) scale(.98);pointer-events:none;
@@ -344,15 +349,18 @@
   .dp-nav{background:rgba(255,255,255,.5);border:1px solid var(--glass-brd);width:34px;height:34px;border-radius:50%;
     cursor:pointer;display:grid;place-items:center;font-size:16px;color:var(--sage);transition:background .15s,color .15s,transform .15s}
   .dp-nav:hover{background:var(--sage);color:#fff;transform:scale(1.08)}
-  .dp-dows{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px}
+  .dp-dows{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-bottom:4px}
   .dp-dows span{text-align:center;font-size:11px;color:var(--ink-soft);font-weight:500;padding:4px 0;text-transform:uppercase}
-  .dp-days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
-  .dp-day{aspect-ratio:1;border:none;background:none;cursor:pointer;border-radius:50%;font-family:inherit;
+  /* minmax(0,1fr): sem isso o mínimo automático de cada dia (44px) somava 326px numa área de 268px */
+  .dp-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+  .dp-day{aspect-ratio:1;min-width:0;width:100%;border:none;background:none;cursor:pointer;border-radius:50%;font-family:inherit;
     font-size:14px;color:var(--ink);display:grid;place-items:center;transition:background .15s,color .15s,transform .15s,box-shadow .15s}
   .dp-day:hover{background:var(--sage-tint);transform:scale(1.1)}
   .dp-day.sel{background:var(--sage);color:#fff;font-weight:600;box-shadow:0 4px 12px rgba(192,83,58,.4)}
   .dp-day.today{border:1.5px solid var(--sage)}
-  .dp-day.empty{visibility:hidden;cursor:default}
+  /* célula antes do dia 1: NÃO usar a classe .empty (é a caixa de "nenhum resultado", com padding de 22px,
+     que esticava a linha para 44px e, pelo aspect-ratio, a coluna também) */
+  .dp-day.dp-blank{visibility:hidden;cursor:default}
   .dp-day.muted{color:var(--ink-soft);opacity:.4;cursor:not-allowed;text-decoration:line-through}
   .dp-day.muted:hover{background:none;transform:none}
   .dp-nav:disabled{opacity:.35;cursor:not-allowed}
@@ -1102,7 +1110,7 @@ async function loadAgendadas(){
       <div class="when">${quando} · ${esc(h)}</div>
       <div class="info">
         <div class="nome">${esc(r.cliente_nome)}</div>
-        <div class="meta">${esc(r.psicologo_nome)}${r.cliente_telefone?' · '+esc(r.cliente_telefone):''}</div>
+        <div class="meta">${esc(r.psicologo_nome)}${r.cliente_telefone?' · <span class="nw">'+esc(r.cliente_telefone)+'</span>':''}</div>
       </div>
       <div class="ag-acoes">
         <button class="btn-mover-sm" data-id="${esc(r.id)}"
@@ -1322,12 +1330,16 @@ const Pop=(()=>{
     const below=vh-r.bottom-m, above=r.top-m;
     const up=h+8>below && above>below;            // abre para cima se não cabe embaixo e há mais espaço em cima
     let top=up ? r.top-8-h : r.bottom+8;
-    top=Math.max(m,Math.min(top,vh-h-m));
     let left=r.left;
     if(left+w>vw-m) left=r.right-w;                // perto da borda direita: alinha pela direita do campo
+    // tela baixa (celular deitado): não cabe nem em cima nem embaixo → abre AO LADO do campo, se houver espaço,
+    // em vez de cobrir o próprio campo
+    const lado=h+8>below && h+8>above && (vw-r.right-m>=w+8 || r.left-m>=w+8);
+    if(lado){ left=vw-r.right-m>=w+8 ? r.right+8 : r.left-8-w; top=r.top+r.height/2-h/2; }
+    top=Math.max(m,Math.min(top,vh-h-m));
     left=Math.max(m,Math.min(left,vw-w-m));
     pop.style.top=Math.round(top)+'px'; pop.style.left=Math.round(left)+'px';
-    pop.classList.toggle('up',up);
+    pop.classList.toggle('up',up&&!lado);
   }
   function open(pop,field,close){
     if(atual&&atual.pop!==pop) atual.close();
@@ -1425,7 +1437,7 @@ const DatePicker=(()=>{
         <button type="button" class="dp-nav next" aria-label="Próximo mês">›</button></div>
         <div class="dp-dows" aria-hidden="true">${DOWS.map(d=>`<span>${d}</span>`).join('')}</div>
         <div class="dp-days">`;
-      for(let i=0;i<first;i++) h+=`<span class="dp-day empty" aria-hidden="true"></span>`;
+      for(let i=0;i<first;i++) h+=`<span class="dp-day dp-blank" aria-hidden="true"></span>`;
       for(let d=1;d<=dim;d++){
         const iso=`${y}-${p2(m+1)}-${p2(d)}`, off=desabilitado(iso), dt=new Date(y,m,d);
         let c='dp-day';

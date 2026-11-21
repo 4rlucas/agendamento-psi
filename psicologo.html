@@ -16,6 +16,7 @@
     --sage:#c0533a; --sage-deep:#9a4026; --sage-tint:rgba(192,83,58,.14);
     --amber:#d98a86; --amber-tint:#f7e2de; --danger:#b4453a;
     --danger-tint:#f4e0de; --danger-text:#a23d33; /* vermelho para TEXTO: ≥4.5 sobre os tints */
+    --danger-pill:rgba(180,69,58,.13); /* fundo de selo/botão pequeno vermelho: visível sobre o vidro */
     --radius:24px; --radius-sm:16px; --glass-brd:rgba(255,255,255,.6);
     --cell-brd:#a3857a; /* borda de célula vazia: 3:1 contra o fundo (WCAG 1.4.11) */
     --busy-brd:#a35d61; /* borda "Consulta marcada": rosa queimado escuro, 3.9:1 (antes #d98a86 = 2.13) */
@@ -84,7 +85,7 @@
   .btn-ghost:hover{background:rgba(255,255,255,.7)}
   .err{color:var(--danger-text);font-size:13px;margin-top:12px;min-height:18px}
 
-  main{padding:26px 0 80px}
+  main{padding:32px 0 80px}
   .greeting{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:38px;margin-bottom:2px}
   .greeting-sub{color:var(--ink-soft);font-size:16px;margin-bottom:24px}
 
@@ -165,9 +166,12 @@
   .appt .obs{font-size:13px;color:var(--ink-soft);margin-top:3px}
   .vazio{font-style:italic;color:var(--ink-soft)} /* "Sem observações": sem opacity, 5.4:1 */
   .appt .tel{font-size:12px;color:var(--ink-soft);margin-top:2px}
-  .appt .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:8px;margin-top:6px}
+  /* selo: estilo base vale em qualquer lista (antes só dentro de .appt; no Histórico ficava sem padding) */
+  .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:8px}
+  .appt .tag{margin-top:6px}
   .tag.confirmado{background:var(--sage-tint);color:var(--sage-deep)}
   .tag.realizada{background:#e6ebe9;color:var(--ink-soft)}
+  .tag.faltou{background:var(--danger-pill);color:var(--danger-text)}
 
   /* feedback */
   .fb-item{padding:16px 0;border-bottom:1px solid var(--line)}
@@ -212,7 +216,7 @@
     .agenda-row .btn{width:100%}
   }
   .btn-copiar{background:var(--sage-tint);color:var(--sage-deep);border:none;border-radius:6px;
-    padding:2px 8px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;margin-left:4px}
+    padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;margin-left:4px;min-height:26px}
   .btn-copiar:hover{background:var(--sage);color:#fff}
   .agenda-status{font-size:13px;margin-top:10px}
   .agenda-status.ok{color:var(--sage-deep)}
@@ -244,7 +248,8 @@
   /* ================= RESPONSIVO ================= */
   @media (max-width:768px){
     .wrap{padding:0 16px}
-    main{padding:18px 0 calc(60px + env(safe-area-inset-bottom,0px))}
+    main{padding:20px 0 calc(60px + env(safe-area-inset-bottom,0px))}
+    .appt-foot .btn-mover-sm{padding:10px 16px;min-height:40px}
     .greeting{font-size:30px;line-height:1.2} /* maior que o h2 dos cards (23px) */
     /* abas rolam horizontalmente */
     .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;gap:2px}
@@ -930,7 +935,7 @@ async function loadHistorico(){
         <span class="pac">${esc(a.cliente_nome||'Paciente')}</span>
         <span class="meta">${esc(quando)}</span>
       </div>
-      <span class="tag ${e.compareceu?'confirmado':'realizada'}" style="margin-bottom:8px">
+      <span class="tag ${e.compareceu?'confirmado':'faltou'}" style="margin-bottom:8px">
         ${e.compareceu?'Compareceu':'Faltou'}</span>
       <div class="obs" style="margin-top:6px;white-space:pre-wrap">${e.evolucao?esc(e.evolucao):'<em class="vazio">Sem anotações</em>'}</div>
     </div>`;
@@ -1043,12 +1048,16 @@ const Pop=(()=>{
     const below=vh-r.bottom-m, above=r.top-m;
     const up=h+8>below && above>below;            // abre para cima se não cabe embaixo e há mais espaço em cima
     let top=up ? r.top-8-h : r.bottom+8;
-    top=Math.max(m,Math.min(top,vh-h-m));
     let left=r.left;
     if(left+w>vw-m) left=r.right-w;                // perto da borda direita: alinha pela direita do campo
+    // tela baixa (celular deitado): não cabe nem em cima nem embaixo → abre AO LADO do campo, se houver espaço,
+    // em vez de cobrir o próprio campo
+    const lado=h+8>below && h+8>above && (vw-r.right-m>=w+8 || r.left-m>=w+8);
+    if(lado){ left=vw-r.right-m>=w+8 ? r.right+8 : r.left-8-w; top=r.top+r.height/2-h/2; }
+    top=Math.max(m,Math.min(top,vh-h-m));
     left=Math.max(m,Math.min(left,vw-w-m));
     pop.style.top=Math.round(top)+'px'; pop.style.left=Math.round(left)+'px';
-    pop.classList.toggle('up',up);
+    pop.classList.toggle('up',up&&!lado);
   }
   function open(pop,field,close){
     if(atual&&atual.pop!==pop) atual.close();
