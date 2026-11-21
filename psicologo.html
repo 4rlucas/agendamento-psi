@@ -14,8 +14,10 @@
     --ink:#44302a; --ink-soft:#7d5a4e;
     --line:rgba(255,255,255,.6); --line-solid:#e7d4c8;
     --sage:#c0533a; --sage-deep:#9a4026; --sage-tint:rgba(192,83,58,.14);
-    --amber:#d98a86; --amber-tint:#f7e2de; --danger:#b4453a; --danger-tint:#f4e0de;
+    --amber:#d98a86; --amber-tint:#f7e2de; --danger:#b4453a;
+    --danger-tint:#f4e0de; --danger-text:#a23d33; /* vermelho para TEXTO: ≥4.5 sobre os tints */
     --radius:24px; --radius-sm:16px; --glass-brd:rgba(255,255,255,.6);
+    --cell-brd:#a3857a; /* borda de célula vazia: 3:1 contra o fundo (WCAG 1.4.11) */
     --shadow:0 10px 44px rgba(68,48,42,.1);
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -57,6 +59,8 @@
   @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
   .login-card h1{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:36px;margin-bottom:6px}
   .login-card p.sub{color:var(--ink-soft);font-size:14px;margin-bottom:28px}
+  .login-brand i,.login-logo i{font-style:italic;font-weight:500;color:var(--sage)}
+  .login-logo{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--ink);margin-bottom:14px;line-height:1}
   label{display:block;font-size:12px;font-weight:500;margin-bottom:7px;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase}
   input,select,textarea{width:100%;font-family:inherit;font-weight:400;font-size:16px;color:var(--ink);
     background:rgba(255,255,255,.5);border:1px solid var(--glass-brd);border-radius:var(--radius-sm);padding:14px 16px;
@@ -76,7 +80,7 @@
   .btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none}
   .btn-ghost{background:rgba(255,255,255,.4);color:var(--ink);border:1px solid var(--glass-brd)}
   .btn-ghost:hover{background:rgba(255,255,255,.7)}
-  .err{color:var(--danger);font-size:13px;margin-top:12px;min-height:18px}
+  .err{color:var(--danger-text);font-size:13px;margin-top:12px;min-height:18px}
 
   main{padding:26px 0 80px}
   .greeting{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:38px;margin-bottom:2px}
@@ -88,7 +92,7 @@
     color:var(--ink-soft);padding:11px 16px;cursor:pointer;border-bottom:2px solid transparent;
     margin-bottom:-1px;transition:color .2s,border-color .2s}
   .tab:hover{color:var(--ink)}
-  .tab.active{color:var(--sage);border-color:var(--sage);font-weight:500}
+  .tab.active{color:var(--sage-deep);border-color:var(--sage);font-weight:500} /* texto 14px: sage-deep passa AA */
   .tab .badge{display:inline-block;background:var(--sage);color:#fff;font-size:11px;
     border-radius:40px;padding:1px 8px;margin-left:6px;font-weight:500}
 
@@ -123,7 +127,7 @@
   .time-label{font-size:12px;color:var(--ink-soft);display:flex;align-items:center;justify-content:flex-end;
     padding-right:6px;height:38px}
   .cell{height:38px;width:100%;padding:0;font-family:inherit;
-    border-radius:10px;border:1.5px solid var(--line-solid);background:var(--surface-solid);cursor:pointer;
+    border-radius:10px;border:1px solid var(--cell-brd);background:var(--surface-solid);cursor:pointer;
     transition:background .15s,border-color .15s,transform .1s;font-size:12px;display:flex;align-items:center;
     justify-content:center;color:transparent;user-select:none}
   .cell:hover{border-color:var(--sage);transform:scale(1.04)}
@@ -137,7 +141,9 @@
   .cal-legend .sw{width:14px;height:14px;border-radius:5px;border:1.5px solid}
   .sw.free{background:var(--sage-tint);border-color:var(--sage)}
   .sw.busy{background:var(--amber-tint);border-color:var(--amber)}
-  .sw.closed{background:var(--surface-solid);border-color:var(--line-solid)}
+  .sw.closed{background:var(--surface-solid);border-color:var(--cell-brd);border-width:1px}
+  .cell.past{opacity:.45;cursor:not-allowed}
+  .cell.past:hover{transform:none;border-color:var(--cell-brd)}
   .cal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
 
   /* consultas */
@@ -149,6 +155,7 @@
   .appt .body{flex:1}
   .appt .pac{font-weight:600;font-size:15px}
   .appt .obs{font-size:13px;color:var(--ink-soft);margin-top:3px}
+  .vazio{font-style:italic;color:var(--ink-soft)} /* "Sem observações": sem opacity, 5.4:1 */
   .appt .tel{font-size:12px;color:var(--ink-soft);margin-top:2px}
   .appt .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:8px;margin-top:6px}
   .tag.confirmado{background:var(--sage-tint);color:var(--sage-deep)}
@@ -164,7 +171,7 @@
   .chip{border:1px solid var(--glass-brd);background:rgba(255,255,255,.4);border-radius:9px;padding:7px 14px;
     font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;color:var(--ink);transition:all .12s}
   .chip.sel-ok{background:var(--sage-tint);border-color:var(--sage);color:var(--sage-deep)}
-  .chip.sel-no{background:var(--danger-tint);border-color:var(--danger);color:var(--danger)}
+  .chip.sel-no{background:var(--danger-tint);border-color:var(--danger);color:var(--danger-text)}
   .fb-item textarea{margin-bottom:10px}
   .fb-save{display:flex;justify-content:flex-end}
   .btn-sm{font-size:13px;padding:8px 14px}
@@ -199,8 +206,8 @@
     padding:2px 8px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;margin-left:4px}
   .btn-copiar:hover{background:var(--sage);color:#fff}
   .agenda-status{font-size:13px;margin-top:10px}
-  .agenda-status.ok{color:var(--sage)}
-  .agenda-status.err{color:var(--danger)}
+  .agenda-status.ok{color:var(--sage-deep)}
+  .agenda-status.err{color:var(--danger-text)}
 
   /* ações no rodapé da consulta */
   .appt-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
@@ -223,13 +230,13 @@
   .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
   .mover-preview{margin-top:12px;padding:14px 16px;background:var(--sage-tint);border-radius:var(--radius-sm);
     font-size:13px;color:var(--sage-deep);max-height:180px;overflow-y:auto}
-  .mover-preview .conf{color:var(--danger);font-weight:600}
+  .mover-preview .conf{color:var(--danger-text);font-weight:600}
 
   /* ================= RESPONSIVO ================= */
   @media (max-width:768px){
     .wrap{padding:0 16px}
     main{padding:18px 0 calc(60px + env(safe-area-inset-bottom,0px))}
-    .greeting{font-size:21px}
+    .greeting{font-size:30px;line-height:1.2} /* maior que o h2 dos cards (23px) */
     /* abas rolam horizontalmente */
     .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;gap:2px}
     .tab{white-space:nowrap;padding:12px 13px}
@@ -286,10 +293,7 @@
     *{animation-duration:.01ms!important;transition-duration:.01ms!important}
   }
   /* micro-interações extras */
-  .slot:active,.psi:active,.btn:active{transform:scale(.97)}
-  @keyframes pulse-sel{0%{box-shadow:0 0 0 0 rgba(192,83,58,.45)}100%{box-shadow:0 0 0 14px rgba(192,83,58,0)}}
-  .slot.sel{animation:pulse-sel .5s ease-out}
-  @media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+  .btn:active{transform:scale(.97)}
   /* ===== time picker próprio ===== */
   .tp{position:relative}
   .tp-field{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;
@@ -313,7 +317,7 @@
   .tp-col .lbl{position:sticky;top:0;background:#fdf6f0;text-align:center;font-size:10px;letter-spacing:.1em;
     text-transform:uppercase;color:var(--ink-soft);padding:4px 0;font-weight:500;z-index:1}
   .tp-opt{border:none;background:none;cursor:pointer;font-family:inherit;font-size:15px;color:var(--ink);
-    padding:9px 0;text-align:center;border-radius:10px;transition:all .12s;font-variant-numeric:tabular-nums}
+    padding:9px 0;text-align:center;border-radius:10px;transition:background .12s,color .12s;font-variant-numeric:tabular-nums}
   .tp-opt:hover{background:var(--sage-tint)}
   .tp-opt.sel{background:var(--sage);color:#fff;font-weight:600}
 </style>
@@ -322,30 +326,31 @@
 
 <!-- LOGIN -->
 <div id="loginScreen" class="login-screen">
-  <div class="login-card">
-    <h1>Agenda</h1>
-    <p class="sub">Acesso do profissional</p>
+  <form class="login-card" id="loginForm" novalidate>
+    <h1 class="login-brand">Cuidar <i>é amar</i></h1>
+    <p class="sub">Agenda do profissional</p>
     <div class="field"><label for="email">E-mail</label>
       <input id="email" type="email" autocomplete="username" placeholder="voce@clinica.com"></div>
     <div class="field"><label for="senha">Senha</label>
       <input id="senha" type="password" autocomplete="current-password" placeholder="••••••••"></div>
-    <button id="btnLogin" class="btn btn-primary" style="width:100%">Entrar</button>
-    <div id="loginErr" class="err"></div>
-  </div>
+    <button id="btnLogin" type="submit" class="btn btn-primary" style="width:100%">Entrar</button>
+    <div id="loginErr" class="err" role="alert"></div>
+  </form>
 </div>
 
 <!-- TROCA DE SENHA (1º login) -->
 <div id="trocaScreen" class="login-screen hidden">
-  <div class="login-card">
+  <form class="login-card" id="trocaForm" novalidate>
+    <div class="login-logo" aria-hidden="true">Cuidar <i>é amar</i></div>
     <h1>Bem-vindo(a)</h1>
     <p class="sub">Por segurança, defina uma nova senha para continuar.</p>
     <div class="field"><label for="novaSenha">Nova senha</label>
       <input id="novaSenha" type="password" autocomplete="new-password" placeholder="mínimo 6 caracteres"></div>
     <div class="field"><label for="novaSenha2">Confirme a nova senha</label>
       <input id="novaSenha2" type="password" autocomplete="new-password" placeholder="repita a senha"></div>
-    <button id="btnTrocarSenha" class="btn btn-primary" style="width:100%">Salvar e entrar</button>
-    <div id="trocaErr" class="err"></div>
-  </div>
+    <button id="btnTrocarSenha" type="submit" class="btn btn-primary" style="width:100%">Salvar e entrar</button>
+    <div id="trocaErr" class="err" role="alert"></div>
+  </form>
 </div>
 
 <!-- APP -->
@@ -554,7 +559,9 @@ $('#btnLogin').addEventListener('click',async()=>{
   if(error){$('#loginErr').textContent='E-mail ou senha inválidos.';return;}
   await enterApp();
 });
-$('#senha').addEventListener('keydown',e=>{if(e.key==='Enter')$('#btnLogin').click();});
+// Enter em qualquer campo envia (o botão é type=submit; a lógica fica no click do botão)
+$('#loginForm').addEventListener('submit',e=>e.preventDefault());
+$('#trocaForm').addEventListener('submit',e=>e.preventDefault());
 $('#btnLogout').addEventListener('click',async()=>{await sb.auth.signOut();location.reload();});
 
 // ===== TABS =====
@@ -656,13 +663,17 @@ async function renderWeek(){
     html+=`<div class="day-head ${iso===todayIso?'today':''}" aria-hidden="true"><div class="dow">${DOW[d.getDay()]}</div><div class="dnum">${d.getDate()}</div></div>`;}
   // linhas — cada célula é um botão (teclado + leitor de tela)
   let primeira=true;
+  const agoraHM=pad(new Date().getHours())+':'+pad(new Date().getMinutes());
   times.forEach(t=>{
     html+=`<div class="time-label" aria-hidden="true">${t}</div>`;
     for(let i=0;i<7;i++){const d=addDays(start,i);const iso=isoDate(d);const key=iso+'|'+t;
       const exist=state.slotsExist.has(key);const busy=exist&&state.slotsExist.get(key);
+      const passado=iso<todayIso||(iso===todayIso&&t<agoraHM);
       let cls='cell';if(busy)cls+=' busy';else if(exist){cls+=' free';state.cellSel.add(key);}
-      html+=`<button type="button" class="${cls}" data-key="${key}" data-busy="${busy?1:0}" tabindex="${primeira?0:-1}"`
-        +`${busy?' aria-disabled="true"':` aria-pressed="${exist?'true':'false'}"`} aria-label="${cellLabel(d,t,busy?'busy':exist?'free':'closed')}"></button>`;
+      if(passado)cls+=' past';
+      const estado=busy?'busy':exist?'free':'closed';
+      html+=`<button type="button" class="${cls}" data-key="${key}" data-busy="${busy?1:0}" data-past="${passado?1:0}" tabindex="${primeira?0:-1}"`
+        +`${busy||passado?' aria-disabled="true"':''}${busy?'':` aria-pressed="${exist?'true':'false'}"`} aria-label="${cellLabel(d,t,estado)}${passado?' (já passou)':''}"></button>`;
       primeira=false;}
   });
   grid.innerHTML=html;
@@ -670,6 +681,7 @@ async function renderWeek(){
     c.addEventListener('click',()=>{
       grid.querySelectorAll('.cell').forEach(x=>x.tabIndex=-1); c.tabIndex=0;
       if(c.dataset.busy==='1'){toast('Há consulta marcada neste horário.',true);return;}
+      if(c.dataset.past==='1'){toast('Este horário já passou.',true);return;}
       const key=c.dataset.key, d=new Date(key.split('|')[0]+'T00:00:00'), t=key.split('|')[1];
       const livre=!c.classList.contains('free');
       c.classList.toggle('free',livre); livre?state.cellSel.add(key):state.cellSel.delete(key);
@@ -749,7 +761,7 @@ async function loadConsultas(){
       <div class="body">
         <div class="pac">${esc(a.cliente_nome)}</div>
         ${a.cliente_telefone?`<div class="tel">${esc(a.cliente_telefone)}</div>`:''}
-        ${a.observacoes?`<div class="obs">${esc(a.observacoes)}</div>`:'<div class="obs" style="opacity:.5">Sem observações</div>'}
+        ${a.observacoes?`<div class="obs">${esc(a.observacoes)}</div>`:'<div class="obs vazio">Sem observações</div>'}
         <div class="appt-foot">
           <span class="tag ${a.status==='realizada'?'realizada':'confirmado'}">${a.status==='realizada'?'Realizada':'Confirmada'}</span>
           ${a.status==='confirmado'?`<button class="btn-mover-sm" data-id="${esc(a.id)}" data-info="${esc(`${a.cliente_nome} · ${quando} ${hhmm(a.hora)}`)}">Mudar horário</button>`:''}
@@ -805,8 +817,8 @@ async function loadFeedback(){
         <span class="meta">${DOW[d.getDay()]} ${d.getDate()}/${pad(d.getMonth()+1)} · ${esc(hhmm(a.hora))}</span>
       </div>
       <div class="fb-controls">
-        <button class="chip chip-ok sel-ok" data-v="1">Compareceu</button>
-        <button class="chip chip-no" data-v="0">Faltou</button>
+        <button type="button" class="chip chip-ok" data-v="1" aria-pressed="false">Compareceu</button>
+        <button type="button" class="chip chip-no" data-v="0" aria-pressed="false">Faltou</button>
       </div>
       <textarea rows="3" placeholder="Evolução da sessão…"></textarea>
       <div class="fb-save"><button class="btn btn-primary btn-sm">Salvar registro</button></div>
@@ -814,14 +826,17 @@ async function loadFeedback(){
   }).join('');
   box.querySelectorAll('.fb-item').forEach(item=>{
     const ok=item.querySelector('.chip-ok'),no=item.querySelector('.chip-no');
-    ok.addEventListener('click',()=>{ok.classList.add('sel-ok');no.classList.remove('sel-no');});
-    no.addEventListener('click',()=>{no.classList.add('sel-no');ok.classList.remove('sel-ok');});
+    const marcar=v=>{ok.classList.toggle('sel-ok',v);no.classList.toggle('sel-no',!v);ok.setAttribute('aria-pressed',String(v));no.setAttribute('aria-pressed',String(!v));};
+    ok.addEventListener('click',()=>marcar(true));
+    no.addEventListener('click',()=>marcar(false));
     item.querySelector('.btn').addEventListener('click',()=>salvarEvolucao(item));
   });
 }
 async function salvarEvolucao(item){
   const id=item.dataset.id;
-  const compareceu=item.querySelector('.chip-ok').classList.contains('sel-ok');
+  const ok=item.querySelector('.chip-ok').classList.contains('sel-ok'), no=item.querySelector('.chip-no').classList.contains('sel-no');
+  if(!ok&&!no){ toast('Marque se o paciente compareceu ou faltou.',true); item.querySelector('.chip-ok').focus(); return; }
+  const compareceu=ok;
   const evo=item.querySelector('textarea').value.trim();
   const b=item.querySelector('.btn');b.disabled=true;b.textContent='Salvando…';
   const{error:e1}=await sb.from('sessoes_evolucao').insert({
@@ -864,7 +879,7 @@ async function loadHistorico(){
       </div>
       <span class="tag ${e.compareceu?'confirmado':'realizada'}" style="margin-bottom:8px">
         ${e.compareceu?'Compareceu':'Faltou'}</span>
-      <div class="obs" style="margin-top:6px;white-space:pre-wrap">${e.evolucao?esc(e.evolucao):'<em style="opacity:.5">Sem anotações</em>'}</div>
+      <div class="obs" style="margin-top:6px;white-space:pre-wrap">${e.evolucao?esc(e.evolucao):'<em class="vazio">Sem anotações</em>'}</div>
     </div>`;
   }).join('');
 }
@@ -985,10 +1000,14 @@ const Pop=(()=>{
   function open(pop,field,close){
     if(atual&&atual.pop!==pop) atual.close();
     atual={pop,field,close};
+    pop.inert=false;
     pop.classList.add('show'); field.classList.add('open'); field.setAttribute('aria-expanded','true');
     place(pop,field);
   }
   function close(pop,field){
+    // inert: nada dentro do popover fechado recebe foco, nem durante a transição de saída
+    if(pop.contains(document.activeElement)) field.focus({preventScroll:true});
+    pop.inert=true;
     pop.classList.remove('show','up'); field.classList.remove('open'); field.setAttribute('aria-expanded','false');
     if(atual&&atual.pop===pop) atual=null;
   }
@@ -1043,10 +1062,11 @@ const TimePicker=(()=>{
     field.setAttribute('aria-haspopup','dialog'); field.setAttribute('aria-expanded','false');
     const nome=ligarLabel(input,field,txtId,'Horário');
     const pop=document.createElement('div'); pop.className='tp-pop';
-    pop.setAttribute('role','dialog'); pop.setAttribute('aria-label',nome+': escolher horário');
+    pop.setAttribute('role','dialog'); pop.setAttribute('aria-label',nome+': escolher horário'); pop.inert=true;
     input.parentNode.insertBefore(tp,input); tp.appendChild(input); tp.appendChild(field);
     document.body.appendChild(pop);
     const txt=field.querySelector('.txt');
+    let escolheu={h:false,m:false}; // fecha sozinho quando hora E minuto forem escolhidos
 
     function refresh(){
       if(input.value){ txt.textContent=input.value.slice(0,5); txt.classList.remove('ph'); }
@@ -1077,9 +1097,13 @@ const TimePicker=(()=>{
       if(h!==null)ch=h; if(m!==null)cm=m;
       input.value=`${ch}:${cm}`;
       input.dispatchEvent(new Event('change',{bubbles:true}));
-      refresh(); render(h!==null?'hcol':'mcol');
+      refresh();
+      if(h!==null) escolheu.h=true; if(m!==null) escolheu.m=true;
+      if(escolheu.h&&escolheu.m){ close(); field.focus(); }
+      else render(h!==null?'mcol':'hcol');   // escolheu a hora: leva o foco para os minutos (e vice-versa)
     }
     function open(){
+      escolheu={h:false,m:false};
       render(); Pop.open(pop,field,close);   // foca só depois de visível (visibility:hidden não recebe foco)
       const b=pop.querySelector('.hcol .tp-opt[tabindex="0"]'); if(b) b.focus({preventScroll:true});
     }

@@ -22,6 +22,7 @@
     --sage-tint:rgba(192,83,58,.14);
     --amber:#d98a86;       /* rosa queimado */
     --danger:#b4453a;
+    --danger-text:#a23d33;  /* vermelho para TEXTO: ≥4.5 sobre os tints */
     --danger-tint:#f4e0de;
     --radius:24px;
     --radius-sm:16px;
@@ -86,6 +87,8 @@
     margin-bottom:6px;letter-spacing:.01em;
   }
   .login-card p.sub{color:var(--ink-soft);font-size:14px;margin-bottom:28px}
+  .login-brand i,.login-logo i{font-style:italic;font-weight:500;color:var(--sage)}
+  .login-logo{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--ink);margin-bottom:14px;line-height:1}
   label{display:block;font-size:12px;font-weight:500;margin-bottom:7px;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase}
   input,select,textarea{
     width:100%;font-family:inherit;font-weight:400;font-size:16px;color:var(--ink);
@@ -108,7 +111,7 @@
   .btn-primary{background:var(--sage);color:#fff;width:100%;box-shadow:0 10px 28px rgba(192,83,58,.34)}
   .btn-primary:hover{background:var(--sage-deep);box-shadow:0 14px 32px rgba(192,83,58,.42)}
   .btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none}
-  .err{color:var(--danger);font-size:13px;margin-top:12px;min-height:18px}
+  .err{color:var(--danger-text);font-size:13px;margin-top:12px;min-height:18px}
 
   /* ---------- app ---------- */
   main{padding:32px 0 80px}
@@ -131,7 +134,7 @@
   }
   .step.active{color:var(--ink);font-weight:500}
   .step.active .num{background:var(--sage);color:#fff}
-  .step.done .num{background:var(--sage-tint);color:var(--sage)}
+  .step.done .num{background:var(--sage-tint);color:var(--sage-deep)}
 
   .card{
     background:var(--surface);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
@@ -140,7 +143,7 @@
     animation:rise .45s cubic-bezier(.2,.8,.2,1);
   }
   .card h2{font-family:'Cormorant Garamond',serif;font-size:23px;font-weight:600;margin-bottom:18px;display:flex;align-items:center;gap:10px}
-  .card h2 .idx{color:var(--sage);font-family:'Cormorant Garamond',serif;font-size:18px}
+  .card h2 .idx{color:var(--sage-deep);font-family:'Cormorant Garamond',serif;font-size:18px}
 
   /* psicólogo picker */
   .psi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
@@ -180,14 +183,16 @@
   .summary b{font-weight:600}
   .summary .line{display:flex;gap:8px;margin-bottom:4px}
   .summary .line:last-child{margin-bottom:0}
-  .summary .k{opacity:.7;min-width:78px}
-  .rec-check{display:flex;align-items:center;gap:9px;font-weight:500;cursor:pointer}
-  .rec-check input{width:auto}
+  .summary .k{font-weight:400;min-width:78px} /* sem opacity: 5.0:1 sobre o tint */
+  /* checkbox de recorrência na identidade (terracota) e rótulo em texto normal, não caixa alta */
+  .rec-check{display:flex;align-items:center;gap:10px;font-weight:400;cursor:pointer;
+    text-transform:none;letter-spacing:0;font-size:15px;color:var(--ink)}
+  .rec-check input{width:20px;height:20px;flex:0 0 auto;accent-color:var(--sage);cursor:pointer;margin:0}
   .rec-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .rec-grid label{font-size:13px;font-weight:500;margin-bottom:6px;display:block}
   .rec-preview{margin-top:12px;padding:12px 14px;background:var(--sage-tint);border-radius:10px;
     font-size:13px;color:var(--sage-deep);max-height:160px;overflow-y:auto}
-  .rec-preview .conf{color:var(--danger);font-weight:600}
+  .rec-preview .conf{color:var(--danger-text);font-weight:600}
 
   .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px;flex-wrap:wrap}
   .btn-ghost{background:rgba(255,255,255,.4);color:var(--ink);border:1px solid var(--glass-brd)}
@@ -217,7 +222,7 @@
     color:var(--ink-soft);padding:11px 16px;cursor:pointer;border-bottom:2px solid transparent;
     margin-bottom:-1px;transition:color .15s,border-color .15s}
   .rtab:hover{color:var(--ink)}
-  .rtab.active{color:var(--sage);border-color:var(--sage)}
+  .rtab.active{color:var(--sage-deep);border-color:var(--sage)} /* texto 14px: sage-deep passa AA */
   .rpanel{display:none}
   .rpanel.active{display:block}
   .cmp-filter{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
@@ -227,7 +232,7 @@
   .cmp-row .nome{flex:1;font-weight:500}
   .cmp-row .st{font-size:12px;font-weight:600;padding:3px 11px;border-radius:8px}
   .st.ok{background:var(--sage-tint);color:var(--sage-deep)}
-  .st.no{background:var(--danger-tint,#f4e0de);color:var(--danger)}
+  .st.no{background:var(--danger-tint,#f4e0de);color:var(--danger-text)}
 
   /* modal */
   /* fundo do modal rola quando o conteúdo não cabe (tela baixa / celular deitado) */
@@ -251,7 +256,7 @@
   .ag-row .info{flex:1}
   .ag-row .info .nome{font-weight:500}
   .ag-row .info .meta{font-size:12px;color:var(--ink-soft)}
-  .btn-cancel-sm{background:var(--danger-tint,#f4e0de);color:var(--danger);border:none;
+  .btn-cancel-sm{background:var(--danger-tint,#f4e0de);color:var(--danger-text);border:none;
     border-radius:8px;padding:7px 13px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
   .btn-cancel-sm:hover{background:var(--danger);color:#fff}
   .ag-acoes{display:flex;gap:8px;flex-wrap:wrap}
@@ -263,7 +268,7 @@
   @media (max-width:768px){
     .wrap{padding:0 16px}
     main{padding:20px 0 calc(60px + env(safe-area-inset-bottom,0px))}
-    .page-title{font-size:22px}
+    .page-title{font-size:30px;line-height:1.2} /* maior que o h2 dos cards (23px) */
     .rtabs{overflow-x:auto;-webkit-overflow-scrolling:touch;gap:2px}
     .rtab{white-space:nowrap;padding:12px 13px;font-size:14px}
     /* inputs 16px evitam o auto-zoom do iOS */
@@ -334,24 +339,25 @@
   .dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
   .dp-head .mes{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:600;text-transform:capitalize}
   .dp-nav{background:rgba(255,255,255,.5);border:1px solid var(--glass-brd);width:34px;height:34px;border-radius:50%;
-    cursor:pointer;display:grid;place-items:center;font-size:16px;color:var(--sage);transition:all .15s}
+    cursor:pointer;display:grid;place-items:center;font-size:16px;color:var(--sage);transition:background .15s,color .15s,transform .15s}
   .dp-nav:hover{background:var(--sage);color:#fff;transform:scale(1.08)}
   .dp-dows{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px}
   .dp-dows span{text-align:center;font-size:11px;color:var(--ink-soft);font-weight:500;padding:4px 0;text-transform:uppercase}
   .dp-days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
   .dp-day{aspect-ratio:1;border:none;background:none;cursor:pointer;border-radius:50%;font-family:inherit;
-    font-size:14px;color:var(--ink);display:grid;place-items:center;transition:all .15s}
+    font-size:14px;color:var(--ink);display:grid;place-items:center;transition:background .15s,color .15s,transform .15s,box-shadow .15s}
   .dp-day:hover{background:var(--sage-tint);transform:scale(1.1)}
   .dp-day.sel{background:var(--sage);color:#fff;font-weight:600;box-shadow:0 4px 12px rgba(192,83,58,.4)}
   .dp-day.today{border:1.5px solid var(--sage)}
   .dp-day.empty{visibility:hidden;cursor:default}
-  .dp-day.muted{color:var(--line-solid);cursor:default}
+  .dp-day.muted{color:var(--ink-soft);opacity:.4;cursor:not-allowed;text-decoration:line-through}
   .dp-day.muted:hover{background:none;transform:none}
+  .dp-nav:disabled{opacity:.35;cursor:not-allowed}
+  .dp-nav:disabled:hover{background:rgba(255,255,255,.5);color:var(--sage);transform:none}
   /* micro-interações extras */
   .slot:active,.psi:active,.btn:active{transform:scale(.97)}
   @keyframes pulse-sel{0%{box-shadow:0 0 0 0 rgba(192,83,58,.45)}100%{box-shadow:0 0 0 14px rgba(192,83,58,0)}}
   .slot.sel{animation:pulse-sel .5s ease-out}
-  @media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
   /* ===== time picker próprio ===== */
   .tp{position:relative}
   .tp-field{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;
@@ -374,7 +380,7 @@
   .tp-col .lbl{position:sticky;top:0;background:#fdf6f0;text-align:center;font-size:10px;letter-spacing:.1em;
     text-transform:uppercase;color:var(--ink-soft);padding:4px 0;font-weight:500;z-index:1}
   .tp-opt{border:none;background:none;cursor:pointer;font-family:inherit;font-size:15px;color:var(--ink);
-    padding:9px 0;text-align:center;border-radius:10px;transition:all .12s;font-variant-numeric:tabular-nums}
+    padding:9px 0;text-align:center;border-radius:10px;transition:background .12s,color .12s;font-variant-numeric:tabular-nums}
   .tp-opt:hover{background:var(--sage-tint)}
   .tp-opt.sel{background:var(--sage);color:#fff;font-weight:600}
 </style>
@@ -383,9 +389,9 @@
 
 <!-- ===================== LOGIN ===================== -->
 <div id="loginScreen" class="login-screen">
-  <div class="login-card">
-    <h1>Painel</h1>
-    <p class="sub">Acesso Admin</p>
+  <form class="login-card" id="loginForm" novalidate>
+    <h1 class="login-brand">Cuidar <i>é amar</i></h1>
+    <p class="sub">Painel administrativo · acesso da recepção</p>
     <div class="field">
       <label for="email">E-mail</label>
       <input id="email" type="email" autocomplete="username" placeholder="voce@clinica.com">
@@ -394,14 +400,15 @@
       <label for="senha">Senha</label>
       <input id="senha" type="password" autocomplete="current-password" placeholder="••••••••">
     </div>
-    <button id="btnLogin" class="btn btn-primary">Entrar</button>
-    <div id="loginErr" class="err"></div>
-  </div>
+    <button id="btnLogin" type="submit" class="btn btn-primary">Entrar</button>
+    <div id="loginErr" class="err" role="alert"></div>
+  </form>
 </div>
 
 <!-- ===================== TROCA DE SENHA (1º login) ===================== -->
 <div id="trocaScreen" class="login-screen hidden">
-  <div class="login-card">
+  <form class="login-card" id="trocaForm" novalidate>
+    <div class="login-logo" aria-hidden="true">Cuidar <i>é amar</i></div>
     <h1>Bem-vindo(a)</h1>
     <p class="sub">Por segurança, defina uma nova senha para continuar.</p>
     <div class="field">
@@ -412,9 +419,9 @@
       <label for="novaSenha2">Confirme a nova senha</label>
       <input id="novaSenha2" type="password" autocomplete="new-password" placeholder="repita a senha">
     </div>
-    <button id="btnTrocarSenha" class="btn btn-primary">Salvar e entrar</button>
-    <div id="trocaErr" class="err"></div>
-  </div>
+    <button id="btnTrocarSenha" type="submit" class="btn btn-primary">Salvar e entrar</button>
+    <div id="trocaErr" class="err" role="alert"></div>
+  </form>
 </div>
 
 <!-- ===================== APP ===================== -->
@@ -762,7 +769,9 @@ $('#btnLogin').addEventListener('click', async ()=>{
   if(error){ $('#loginErr').textContent='E-mail ou senha inválidos.'; return; }
   await enterApp();
 });
-$('#senha').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#btnLogin').click(); });
+// Enter em qualquer campo envia (o botão é type=submit; a lógica fica no click do botão)
+$('#loginForm').addEventListener('submit',e=>e.preventDefault());
+$('#trocaForm').addEventListener('submit',e=>e.preventDefault());
 
 $('#btnLogout').addEventListener('click', async ()=>{
   await sb.auth.signOut(); location.reload();
@@ -789,12 +798,17 @@ async function loadPsicologos(){
       // revela passo 2
       $('#cardData').classList.remove('hidden');
       setStep(2);
+      // não deixa marcar no passado (atualiza a cada escolha, caso a página fique aberta após a meia-noite)
+      $('#dataInput').min=isoLocal();
+      if($('#dataInput').value && $('#dataInput').value<isoLocal()){ $('#dataInput').value=''; }
       // default: próxima data
       if(!$('#dataInput').value){
         const t=new Date(); t.setDate(t.getDate()+1);
         $('#dataInput').value=isoLocal(t);$('#dataInput').dispatchEvent(new Event('dp-refresh'));
       }
-      $('#dataInput').focus();
+      // leva o usuário ao passo 2 (o input original é hidden; o foco vai para o botão do picker)
+      $('#cardData').scrollIntoView({behavior:'smooth',block:'nearest'});
+      $('#dataInput-btn')?.focus({preventScroll:true});
       // reseta passos seguintes
       resetFrom(3);
     });
@@ -809,6 +823,7 @@ let horariosSeq=0; // descarta respostas de buscas antigas
 async function loadHorarios(){
   const data=$('#dataInput').value;
   if(!data){ toast('Escolha uma data.',true); return; }
+  if(data<isoLocal()){ toast('Escolha uma data a partir de hoje.',true); return; }
   if(!state.psicologo){ toast('Escolha um profissional.',true); return; }
   resetFrom(3);
   state.data=data;
@@ -1243,23 +1258,19 @@ $('#moverConfirmar').addEventListener('click', async ()=>{
 });
 
 // ===================== CRIAR USUÁRIOS (ADM) =====================
-function initUsuarios(){
-  // mostra/esconde o campo especialidade conforme o papel
-  const toggle=()=>{
-    const ehPsi = $('#uPapel').value==='psicologo';
-    $('#uEspField').style.display = ehPsi?'':'none';
-  };
-  $('#uPapel').removeEventListener('change', toggle);
-  $('#uPapel').addEventListener('change', toggle);
-  toggle();
+// mostra/esconde o campo especialidade conforme o papel (listener registrado uma única vez)
+function toggleEspecialidade(){
+  $('#uEspField').style.display = $('#uPapel').value==='psicologo' ? '' : 'none';
 }
+$('#uPapel').addEventListener('change', toggleEspecialidade);
+function initUsuarios(){ toggleEspecialidade(); }
 $('#btnCriarUsuario').addEventListener('click', async ()=>{
   const nome=$('#uNome').value.trim();
   const papel=$('#uPapel').value;
   const esp=$('#uEsp').value.trim();
   const email=$('#uEmail').value.trim();
   const senha=$('#uSenha').value;
-  const msg=$('#uMsg'); msg.style.color='var(--danger)'; msg.textContent='';
+  const msg=$('#uMsg'); msg.style.color='var(--danger-text)'; msg.textContent='';
 
   if(!nome||!email||!senha){ msg.textContent='Preencha nome, e-mail e senha.'; return; }
   if(senha.length<6){ msg.textContent='A senha deve ter ao menos 6 caracteres.'; return; }
@@ -1274,7 +1285,7 @@ $('#btnCriarUsuario').addEventListener('click', async ()=>{
     msg.textContent = 'Erro: ' + (data?.error || error?.message || 'falha ao criar');
     return;
   }
-  msg.style.color='var(--sage)';
+  msg.style.color='var(--sage-deep)';
   msg.textContent = 'Usuário criado com sucesso.';
   $('#uNome').value=''; $('#uEmail').value=''; $('#uSenha').value=''; $('#uEsp').value='';
   toast('Usuário criado com sucesso.');
@@ -1302,10 +1313,14 @@ const Pop=(()=>{
   function open(pop,field,close){
     if(atual&&atual.pop!==pop) atual.close();
     atual={pop,field,close};
+    pop.inert=false;
     pop.classList.add('show'); field.classList.add('open'); field.setAttribute('aria-expanded','true');
     place(pop,field);
   }
   function close(pop,field){
+    // inert: nada dentro do popover fechado recebe foco, nem durante a transição de saída
+    if(pop.contains(document.activeElement)) field.focus({preventScroll:true});
+    pop.inert=true;
     pop.classList.remove('show','up'); field.classList.remove('open'); field.setAttribute('aria-expanded','false');
     if(atual&&atual.pop===pop) atual=null;
   }
@@ -1366,7 +1381,7 @@ const DatePicker=(()=>{
     field.setAttribute('aria-haspopup','dialog'); field.setAttribute('aria-expanded','false');
     const nome=ligarLabel(input,field,txtId,'Data');
     const pop=document.createElement('div'); pop.className='dp-pop';
-    pop.setAttribute('role','dialog'); pop.setAttribute('aria-label',nome+': escolher data');
+    pop.setAttribute('role','dialog'); pop.setAttribute('aria-label',nome+': escolher data'); pop.inert=true;
     input.parentNode.insertBefore(dp,input); dp.appendChild(input); dp.appendChild(field);
     document.body.appendChild(pop);
 
@@ -1470,10 +1485,11 @@ const TimePicker=(()=>{
     field.setAttribute('aria-haspopup','dialog'); field.setAttribute('aria-expanded','false');
     const nome=ligarLabel(input,field,txtId,'Horário');
     const pop=document.createElement('div'); pop.className='tp-pop';
-    pop.setAttribute('role','dialog'); pop.setAttribute('aria-label',nome+': escolher horário');
+    pop.setAttribute('role','dialog'); pop.setAttribute('aria-label',nome+': escolher horário'); pop.inert=true;
     input.parentNode.insertBefore(tp,input); tp.appendChild(input); tp.appendChild(field);
     document.body.appendChild(pop);
     const txt=field.querySelector('.txt');
+    let escolheu={h:false,m:false}; // fecha sozinho quando hora E minuto forem escolhidos
 
     function refresh(){
       if(input.value){ txt.textContent=input.value.slice(0,5); txt.classList.remove('ph'); }
@@ -1504,9 +1520,13 @@ const TimePicker=(()=>{
       if(h!==null)ch=h; if(m!==null)cm=m;
       input.value=`${ch}:${cm}`;
       input.dispatchEvent(new Event('change',{bubbles:true}));
-      refresh(); render(h!==null?'hcol':'mcol');
+      refresh();
+      if(h!==null) escolheu.h=true; if(m!==null) escolheu.m=true;
+      if(escolheu.h&&escolheu.m){ close(); field.focus(); }
+      else render(h!==null?'mcol':'hcol');   // escolheu a hora: leva o foco para os minutos (e vice-versa)
     }
     function open(){
+      escolheu={h:false,m:false};
       render(); Pop.open(pop,field,close);   // foca só depois de visível (visibility:hidden não recebe foco)
       const b=pop.querySelector('.hcol .tp-opt[tabindex="0"]'); if(b) b.focus({preventScroll:true});
     }
