@@ -136,7 +136,7 @@
   .cal-legend .sw{width:14px;height:14px;border-radius:5px;border:1.5px solid}
   .sw.free{background:var(--sage-tint);border-color:var(--sage)}
   .sw.busy{background:var(--amber-tint);border-color:var(--amber)}
-  .sw.empty{background:var(--surface-solid);border-color:var(--line-solid)}
+  .sw.closed{background:var(--surface-solid);border-color:var(--line-solid)}
   .cal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
 
   /* consultas */
@@ -187,8 +187,13 @@
 
   /* card de agenda google */
   .agenda-passos{margin:0 0 16px 18px;font-size:13px;color:var(--ink-soft);line-height:1.7}
-  .agenda-passos b{color:var(--ink);font-weight:600;word-break:break-all}
+  .agenda-passos b{color:var(--ink);font-weight:600}
+  #robotEmail{overflow-wrap:anywhere} /* só o e-mail longo pode quebrar em qualquer ponto */
   .agenda-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+  @media (max-width:768px){
+    .agenda-row{flex-direction:column;align-items:stretch}
+    .agenda-row .btn{width:100%}
+  }
   .btn-copiar{background:var(--sage-tint);color:var(--sage-deep);border:none;border-radius:6px;
     padding:2px 8px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;margin-left:4px}
   .btn-copiar:hover{background:var(--sage);color:#fff}
@@ -203,16 +208,18 @@
   .btn-mover-sm:hover{background:var(--sage);color:#fff}
 
   /* modal */
+  /* fundo do modal rola quando o conteúdo não cabe (tela baixa / celular deitado) */
   .modal-bg{position:fixed;inset:0;background:rgba(68,48,42,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-    display:grid;place-items:center;z-index:60;padding:20px;animation:fade .25s ease}
+    display:flex;overflow-y:auto;overscroll-behavior:contain;z-index:60;padding:20px;animation:fade .25s ease}
   @keyframes fade{from{opacity:0}to{opacity:1}}
   .modal{background:rgba(255,250,247,.82);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);
     border:1px solid var(--glass-brd);border-radius:var(--radius);box-shadow:0 20px 60px rgba(68,48,42,.25);
-    padding:30px;width:100%;max-width:440px;animation:pop .35s cubic-bezier(.2,.9,.3,1.2)}
+    padding:30px;width:100%;max-width:440px;min-width:0;margin:auto;animation:pop .35s cubic-bezier(.2,.9,.3,1.2)}
+  html.modal-open,html.modal-open body{overflow:hidden}
   @keyframes pop{from{opacity:0;transform:scale(.94) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
   .modal h3{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:26px;margin-bottom:8px}
   .modal-info{font-size:14px;color:var(--ink-soft);margin-bottom:16px}
-  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
   .mover-preview{margin-top:12px;padding:14px 16px;background:var(--sage-tint);border-radius:var(--radius-sm);
     font-size:13px;color:var(--sage-deep);max-height:180px;overflow-y:auto}
   .mover-preview .conf{color:var(--danger);font-weight:600}
@@ -250,6 +257,24 @@
     .fb-controls{flex-wrap:wrap}
     .week-nav .label{font-size:14px}
   }
+  /* cabeçalho: marca numa linha só; selo e "Sair" compactos */
+  header .wrap{flex-wrap:nowrap}
+  .brand{min-width:0}
+  .brand .logo{white-space:nowrap}
+  .brand .role{white-space:nowrap}
+  .who{flex:0 0 auto}
+  @media (max-width:480px){
+    header .wrap{gap:10px}
+    .brand{gap:8px}
+    .brand .logo{font-size:22px}
+    .brand .role{font-size:9px;letter-spacing:.1em;padding:3px 8px}
+    .who button{padding:8px 14px}
+    /* botões de ação do modal empilham em largura total (primário em cima) */
+    .modal-actions{flex-direction:column-reverse;align-items:stretch}
+    .modal-actions .btn{width:100%}
+    .modal{padding:24px 20px}
+    .modal-bg{padding:12px}
+  }
   @media (max-width:480px){
     .card{padding:18px}
     .cal-grid{grid-template-columns:46px repeat(7,minmax(96px,1fr));min-width:740px}
@@ -274,12 +299,14 @@
   .tp-field.open{border-color:var(--sage);background:rgba(255,255,255,.85);box-shadow:0 0 0 4px var(--sage-tint)}
   .tp-field .clock{width:17px;height:17px;flex:0 0 auto;stroke:var(--sage);opacity:.85}
   .tp-field .ph{color:var(--ink-soft)}
-  .tp-pop{position:absolute;top:calc(100% + 8px);left:0;z-index:200;display:flex;gap:6px;
+  /* popover fica no <body> (position:fixed) — top/left calculados pelo JS (Pop.place) */
+  .tp-pop{position:fixed;top:0;left:0;z-index:300;display:flex;gap:6px;
     background:#fdf6f0;border:1px solid rgba(192,83,58,.25);border-radius:var(--radius);
-    box-shadow:0 24px 60px rgba(68,48,42,.3);padding:10px;opacity:0;transform:translateY(-8px) scale(.98);
-    pointer-events:none;transition:opacity .2s,transform .2s}
-  .tp-pop.right{left:auto;right:0}
-  .tp-pop.show{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+    box-shadow:0 24px 60px rgba(68,48,42,.3);padding:10px;opacity:0;visibility:hidden;transform:translateY(-8px) scale(.98);
+    pointer-events:none;transition:opacity .2s,transform .2s,visibility 0s .2s}
+  .tp-pop.up{transform:translateY(8px) scale(.98)}
+  .tp-pop.show{opacity:1;visibility:visible;transform:translateY(0) scale(1);pointer-events:auto;transition-delay:0s}
+  .tp-pop.show.up{transform:translateY(0) scale(1)}
   .tp-col{display:flex;flex-direction:column;max-height:220px;overflow-y:auto;width:62px;scrollbar-width:thin}
   .tp-col::-webkit-scrollbar{width:5px}.tp-col::-webkit-scrollbar-thumb{background:var(--sage-tint);border-radius:3px}
   .tp-col .lbl{position:sticky;top:0;background:#fdf6f0;text-align:center;font-size:10px;letter-spacing:.1em;
@@ -365,7 +392,7 @@
           <div id="calGrid" class="cal-grid"></div>
         </div>
         <div class="cal-legend">
-          <span class="k"><span class="sw empty"></span> Fechado (clique para liberar)</span>
+          <span class="k"><span class="sw closed"></span> Fechado (clique para liberar)</span>
           <span class="k"><span class="sw free"></span> Liberado</span>
           <span class="k"><span class="sw busy"></span> Consulta marcada</span>
         </div>
@@ -486,7 +513,9 @@ async function enterApp(){
   // 1º login: força troca de senha antes de entrar
   if(p.senha_provisoria){ mostrarTrocaSenha(); return; }
   state.psicologoId=p.psicologo_id; state.nome=p.nome||'Profissional';
-  $('#userLabel').textContent=state.nome;
+  // o selo mostra o PAPEL; o nome aparece na saudação e como dica (title)
+  $('#userLabel').textContent='Profissional';
+  $('#userLabel').title=state.nome; $('#userLabel').setAttribute('aria-label','Profissional: '+state.nome);
   $('#greeting').textContent='Olá, '+state.nome.split(' ')[0];
   $('#loginScreen').classList.add('hidden'); $('#app').classList.remove('hidden');
   await loadGrade();
@@ -866,61 +895,148 @@ $('#moverConfirmar').addEventListener('click', async ()=>{
 });
 
 
-// ===== TIME PICKER PRÓPRIO =====
-(function(){
+// ===================== POPOVERS (date/time picker) =====================
+// O popover é renderizado direto no <body> com position:fixed, posicionado a partir do campo.
+// Assim ele escapa do contexto de empilhamento dos cards (backdrop-filter) e dos modais,
+// e pode abrir para cima quando não há espaço embaixo.
+const Pop=(()=>{
+  let atual=null; // { pop, field, close }
+  function place(pop,field){
+    const r=field.getBoundingClientRect(), m=8, vw=document.documentElement.clientWidth, vh=innerHeight;
+    const w=pop.offsetWidth, h=pop.offsetHeight;
+    const below=vh-r.bottom-m, above=r.top-m;
+    const up=h+8>below && above>below;            // abre para cima se não cabe embaixo e há mais espaço em cima
+    let top=up ? r.top-8-h : r.bottom+8;
+    top=Math.max(m,Math.min(top,vh-h-m));
+    let left=r.left;
+    if(left+w>vw-m) left=r.right-w;                // perto da borda direita: alinha pela direita do campo
+    left=Math.max(m,Math.min(left,vw-w-m));
+    pop.style.top=Math.round(top)+'px'; pop.style.left=Math.round(left)+'px';
+    pop.classList.toggle('up',up);
+  }
+  function open(pop,field,close){
+    if(atual&&atual.pop!==pop) atual.close();
+    atual={pop,field,close};
+    pop.classList.add('show'); field.classList.add('open'); field.setAttribute('aria-expanded','true');
+    place(pop,field);
+  }
+  function close(pop,field){
+    pop.classList.remove('show','up'); field.classList.remove('open'); field.setAttribute('aria-expanded','false');
+    if(atual&&atual.pop===pop) atual=null;
+  }
+  const reposition=()=>{ if(atual) place(atual.pop,atual.field); };
+  addEventListener('resize',reposition);
+  addEventListener('scroll',reposition,true);      // true: pega também a rolagem do modal
+  // clique/toque fora fecha (pointerdown: antes de o conteúdo do popover ser re-renderizado)
+  document.addEventListener('pointerdown',e=>{
+    if(atual&&!atual.pop.contains(e.target)&&!atual.field.contains(e.target)) atual.close();
+  },true);
+  return { open, close, isOpen:()=>!!atual, current:()=>atual, closeAll:()=>{ if(atual) atual.close(); } };
+})();
+
+// liga o <label for="id"> ao botão visível (o input original vira hidden)
+function ligarLabel(input,field,txtId,padrao){
+  const label=document.querySelector(`label[for="${input.id}"]`);
+  field.id=input.id+'-btn';
+  if(label){
+    label.htmlFor=field.id;                       // clicar no rótulo abre o picker
+    if(!label.id) label.id=input.id+'-lbl';
+    field.setAttribute('aria-labelledby',label.id+' '+txtId);
+    return label.textContent.trim();
+  }
+  field.setAttribute('aria-label',padrao);
+  return padrao;
+}
+// prende o Tab dentro do popover aberto (padrão de date picker em diálogo)
+function prenderTab(pop,e){
+  const els=[...pop.querySelectorAll('button:not([disabled])')].filter(b=>b.tabIndex>=0);
+  if(!els.length) return;
+  const i=els.indexOf(document.activeElement);
+  e.preventDefault();
+  els[(i+(e.shiftKey?-1:1)+els.length)%els.length].focus();
+}
+
+// ===================== TIME PICKER PRÓPRIO =====================
+const TimePicker=(()=>{
   const p2=n=>String(n).padStart(2,'0');
   function build(input){
-    const step = parseInt(input.getAttribute('step')||'0',10);
-    const minStep = step && step%60===0 ? step/60 : 5; // minutos de 5 em 5 (ou pelo step)
+    const step=parseInt(input.getAttribute('step')||'0',10);
+    const minStep=step && step%60===0 ? step/60 : 5; // minutos de 5 em 5 (ou pelo step)
     input.type='hidden';
     const tp=document.createElement('div'); tp.className='tp';
     const field=document.createElement('button'); field.type='button'; field.className='tp-field';
-    field.innerHTML=`<span class="txt ph">--:--</span>
-      <svg class="clock" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>`;
+    const txtId=input.id+'-txt';
+    field.innerHTML=`<span class="txt ph" id="${txtId}">--:--</span>
+      <svg class="clock" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>`;
+    field.setAttribute('aria-haspopup','dialog'); field.setAttribute('aria-expanded','false');
+    const nome=ligarLabel(input,field,txtId,'Horário');
     const pop=document.createElement('div'); pop.className='tp-pop';
-    input.parentNode.insertBefore(tp,input); tp.appendChild(input); tp.appendChild(field); tp.appendChild(pop);
+    pop.setAttribute('role','dialog'); pop.setAttribute('aria-label',nome+': escolher horário');
+    input.parentNode.insertBefore(tp,input); tp.appendChild(input); tp.appendChild(field);
+    document.body.appendChild(pop);
     const txt=field.querySelector('.txt');
 
     function refresh(){
       if(input.value){ txt.textContent=input.value.slice(0,5); txt.classList.remove('ph'); }
       else{ txt.textContent='--:--'; txt.classList.add('ph'); }
     }
-    function render(){
+    function render(focoCol){
       const cur=input.value?input.value.slice(0,5):'';
       const [ch,cm]=cur?cur.split(':'):['',''];
-      let h='<div class="tp-col hcol"><span class="lbl">h</span>';
-      for(let i=0;i<24;i++){const v=p2(i);h+=`<button type="button" class="tp-opt${v===ch?' sel':''}" data-h="${v}">${v}</button>`;}
-      h+='</div><div class="tp-col mcol"><span class="lbl">min</span>';
-      for(let i=0;i<60;i+=minStep){const v=p2(i);h+=`<button type="button" class="tp-opt${v===cm?' sel':''}" data-m="${v}">${v}</button>`;}
+      const opt=(tipo,v,sel,unid)=>`<button type="button" class="tp-opt${sel?' sel':''}" data-${tipo}="${v}" tabindex="-1" aria-label="${+v} ${unid}"${sel?' aria-pressed="true"':''}>${v}</button>`;
+      let h='<div class="tp-col hcol" role="group" aria-label="Horas"><span class="lbl" aria-hidden="true">h</span>';
+      for(let i=0;i<24;i++){const v=p2(i);h+=opt('h',v,v===ch,+v===1?'hora':'horas');}
+      h+='</div><div class="tp-col mcol" role="group" aria-label="Minutos"><span class="lbl" aria-hidden="true">min</span>';
+      for(let i=0;i<60;i+=minStep){const v=p2(i);h+=opt('m',v,v===cm,+v===1?'minuto':'minutos');}
       h+='</div>';
       pop.innerHTML=h;
-      pop.querySelectorAll('[data-h]').forEach(b=>b.onclick=e=>{e.stopPropagation();pick(b.dataset.h,null);});
-      pop.querySelectorAll('[data-m]').forEach(b=>b.onclick=e=>{e.stopPropagation();pick(null,b.dataset.m);});
-      // rola até o selecionado
-      requestAnimationFrame(()=>{
-        const sh=pop.querySelector('.hcol .sel'),sm=pop.querySelector('.mcol .sel');
-        if(sh)sh.scrollIntoView({block:'center'}); if(sm)sm.scrollIntoView({block:'center'});
+      // um item tabulável por coluna: o selecionado (ou o primeiro)
+      pop.querySelectorAll('.tp-col').forEach(col=>{(col.querySelector('.sel')||col.querySelector('.tp-opt')).tabIndex=0;});
+      pop.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>pick(b.dataset.h,null));
+      pop.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>pick(null,b.dataset.m));
+      // rola até o selecionado (só dentro da coluna, sem rolar a página)
+      pop.querySelectorAll('.tp-col').forEach(col=>{
+        const s=col.querySelector('.sel'); if(s) col.scrollTop=s.offsetTop-col.clientHeight/2+s.offsetHeight/2;
       });
+      if(focoCol){ const b=pop.querySelector(`.${focoCol} .tp-opt[tabindex="0"]`); if(b) b.focus({preventScroll:true}); }
     }
     function pick(h,m){
       let [ch,cm]=(input.value?input.value.slice(0,5):'08:00').split(':');
       if(h!==null)ch=h; if(m!==null)cm=m;
       input.value=`${ch}:${cm}`;
       input.dispatchEvent(new Event('change',{bubbles:true}));
-      refresh(); render();
+      refresh(); render(h!==null?'hcol':'mcol');
     }
-    function open(){ render(); pop.classList.add('show'); field.classList.add('open');
-      requestAnimationFrame(()=>{pop.classList.remove('right');const r=pop.getBoundingClientRect();if(r.right>window.innerWidth-8)pop.classList.add('right');});
-    }
-    function close(){ pop.classList.remove('show'); field.classList.remove('open'); }
-    field.onclick=e=>{e.stopPropagation(); pop.classList.contains('show')?close():open();};
-    document.addEventListener('click',e=>{if(!tp.contains(e.target))close();});
+    function open(){ render('hcol'); Pop.open(pop,field,close); }
+    function close(){ Pop.close(pop,field); }
+    field.addEventListener('click',()=>{ pop.classList.contains('show')?close():open(); });
+    pop.addEventListener('keydown',e=>{
+      if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); close(); field.focus(); return; }
+      if(e.key==='Tab'){ prenderTab(pop,e); return; }
+      const b=e.target.closest&&e.target.closest('.tp-opt'); if(!b) return;
+      const col=b.parentElement, itens=[...col.querySelectorAll('.tp-opt')], i=itens.indexOf(b);
+      let alvo=null;
+      if(e.key==='ArrowDown') alvo=itens[Math.min(i+1,itens.length-1)];
+      else if(e.key==='ArrowUp') alvo=itens[Math.max(i-1,0)];
+      else if(e.key==='Home') alvo=itens[0];
+      else if(e.key==='End') alvo=itens[itens.length-1];
+      else if(e.key==='ArrowRight'||e.key==='ArrowLeft'){
+        const outra=pop.querySelector(col.classList.contains('hcol')?'.mcol':'.hcol');
+        const t=outra.querySelector('.tp-opt[tabindex="0"]'); if(t){ e.preventDefault(); t.focus(); } return;
+      }
+      if(alvo){ e.preventDefault(); itens.forEach(x=>x.tabIndex=-1); alvo.tabIndex=0; alvo.focus(); }
+    });
     input.addEventListener('tp-refresh',refresh);
     refresh();
   }
-  function initAll(){ document.querySelectorAll('input[type="time"]').forEach(build); }
-  if(document.readyState!=='loading') initAll(); else document.addEventListener('DOMContentLoaded',initAll);
+  return { initAll:()=>document.querySelectorAll('input[type="time"]').forEach(build) };
 })();
+
+function initPickers(){
+  if(typeof DatePicker!=='undefined') DatePicker.initAll();
+  TimePicker.initAll();
+}
+if(document.readyState!=='loading') initPickers(); else document.addEventListener('DOMContentLoaded',initPickers);
 
 checkSession();
 </script>

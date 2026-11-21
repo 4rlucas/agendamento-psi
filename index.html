@@ -40,7 +40,7 @@
   body::before,body::after{content:"";position:fixed;border-radius:50%;filter:blur(80px);z-index:0;opacity:.55;pointer-events:none}
   body::before{width:460px;height:460px;background:#e8a08a;top:-120px;left:-90px}
   body::after{width:440px;height:440px;background:#d98a86;bottom:-140px;right:-100px}
-  #app,#loginScreen,#trocaScreen,header,main,.modal-bg{position:relative;z-index:1}
+  #app,#loginScreen,#trocaScreen,header,main{position:relative;z-index:1}
   h1,h2,h3,.page-title,.brand,.login-card h1{font-family:'Cormorant Garamond',serif}
   button{touch-action:manipulation}
   /* acessibilidade: foco visível por teclado */
@@ -189,7 +189,7 @@
     font-size:13px;color:var(--sage-deep);max-height:160px;overflow-y:auto}
   .rec-preview .conf{color:var(--danger);font-weight:600}
 
-  .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
+  .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px;flex-wrap:wrap}
   .btn-ghost{background:rgba(255,255,255,.4);color:var(--ink);border:1px solid var(--glass-brd)}
   .btn-ghost:hover{background:rgba(255,255,255,.7)}
   .btn-confirm{background:var(--sage);color:#fff;min-width:180px;box-shadow:0 10px 28px rgba(192,83,58,.34)}
@@ -230,16 +230,19 @@
   .st.no{background:var(--danger-tint,#f4e0de);color:var(--danger)}
 
   /* modal */
+  /* fundo do modal rola quando o conteúdo não cabe (tela baixa / celular deitado) */
   .modal-bg{position:fixed;inset:0;background:rgba(68,48,42,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-    display:grid;place-items:center;z-index:60;padding:20px;animation:fade .25s ease}
+    display:flex;overflow-y:auto;overscroll-behavior:contain;z-index:60;padding:20px;animation:fade .25s ease}
   @keyframes fade{from{opacity:0}to{opacity:1}}
   .modal{background:rgba(255,250,247,.82);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);
     border:1px solid var(--glass-brd);border-radius:var(--radius);box-shadow:0 20px 60px rgba(68,48,42,.25);
-    padding:30px;width:100%;max-width:430px;animation:pop .35s cubic-bezier(.2,.9,.3,1.2)}
+    padding:30px;width:100%;max-width:430px;min-width:0;margin:auto;animation:pop .35s cubic-bezier(.2,.9,.3,1.2)}
+  html.modal-open,html.modal-open body{overflow:hidden}
   @keyframes pop{from{opacity:0;transform:scale(.94) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
   .modal h3{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:26px;margin-bottom:8px}
   .modal-info{font-size:14px;color:var(--ink-soft);margin-bottom:18px}
-  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px;flex-wrap:wrap}
+  .modal-actions .btn,.actions .btn{width:auto} /* .btn-primary é 100% no login; aqui não */
 
   /* consultas agendadas */
   .ag-row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line)}
@@ -286,6 +289,24 @@
     .page-sub{font-size:13px}
     .card{padding:18px}
     .slots{grid-template-columns:repeat(auto-fill,minmax(72px,1fr))}
+    /* botões de ação empilham em largura total (primário em cima) */
+    .actions,.modal-actions{flex-direction:column-reverse;align-items:stretch}
+    .actions .btn,.modal-actions .btn{width:100%;min-width:0}
+    .modal{padding:24px 20px}
+    .modal-bg{padding:12px}
+  }
+  /* cabeçalho: marca numa linha só; selo e "Sair" compactos */
+  header .wrap{flex-wrap:nowrap}
+  .brand{min-width:0}
+  .brand .logo{white-space:nowrap}
+  .brand .role{white-space:nowrap}
+  .who{flex:0 0 auto}
+  @media (max-width:480px){
+    header .wrap{gap:10px}
+    .brand{gap:8px}
+    .brand .logo{font-size:22px}
+    .brand .role{font-size:9px;letter-spacing:.1em;padding:3px 8px}
+    .who button{padding:8px 14px}
   }
   /* respeita quem prefere menos movimento (acessibilidade) */
   @media (prefers-reduced-motion: reduce){
@@ -301,14 +322,15 @@
   .dp-field.open{border-color:var(--sage);background:rgba(255,255,255,.85);box-shadow:0 0 0 4px var(--sage-tint)}
   .dp-field .cal-ico{width:17px;height:17px;flex:0 0 auto;stroke:var(--sage);opacity:.85}
   .dp-field .ph{color:var(--ink-soft)}
-  .dp-pop{position:absolute;top:calc(100% + 8px);left:0;z-index:200;width:300px;max-width:min(300px,88vw);
-    background:#fdf6f0;backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);
+  /* popover fica no <body> (position:fixed) — top/left calculados pelo JS (Pop.place) */
+  .dp-pop{position:fixed;top:0;left:0;z-index:300;width:300px;max-width:calc(100vw - 16px);
+    max-height:calc(100vh - 16px);overflow-y:auto;overscroll-behavior:contain;
+    background:#fdf6f0;
     border:1px solid rgba(192,83,58,.25);border-radius:var(--radius);box-shadow:0 24px 60px rgba(68,48,42,.3);
-    padding:16px;opacity:0;transform:translateY(-8px) scale(.98);pointer-events:none;
-    transition:opacity .2s,transform .2s}
-  /* se estiver muito à direita, abre alinhado pela direita */
-  .dp-pop.right{left:auto;right:0}
-  .dp-pop.show{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+    padding:16px;opacity:0;visibility:hidden;transform:translateY(-8px) scale(.98);pointer-events:none;
+    transition:opacity .2s,transform .2s,visibility 0s .2s}
+  .dp-pop.up,.tp-pop.up{transform:translateY(8px) scale(.98)}
+  .dp-pop.show{opacity:1;visibility:visible;transform:translateY(0) scale(1);pointer-events:auto;transition-delay:0s}
   .dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
   .dp-head .mes{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:600;text-transform:capitalize}
   .dp-nav{background:rgba(255,255,255,.5);border:1px solid var(--glass-brd);width:34px;height:34px;border-radius:50%;
@@ -340,12 +362,13 @@
   .tp-field.open{border-color:var(--sage);background:rgba(255,255,255,.85);box-shadow:0 0 0 4px var(--sage-tint)}
   .tp-field .clock{width:17px;height:17px;flex:0 0 auto;stroke:var(--sage);opacity:.85}
   .tp-field .ph{color:var(--ink-soft)}
-  .tp-pop{position:absolute;top:calc(100% + 8px);left:0;z-index:200;display:flex;gap:6px;
+  .tp-pop{position:fixed;top:0;left:0;z-index:300;display:flex;gap:6px;
     background:#fdf6f0;border:1px solid rgba(192,83,58,.25);border-radius:var(--radius);
-    box-shadow:0 24px 60px rgba(68,48,42,.3);padding:10px;opacity:0;transform:translateY(-8px) scale(.98);
-    pointer-events:none;transition:opacity .2s,transform .2s}
-  .tp-pop.right{left:auto;right:0}
-  .tp-pop.show{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+    box-shadow:0 24px 60px rgba(68,48,42,.3);padding:10px;opacity:0;visibility:hidden;transform:translateY(-8px) scale(.98);
+    pointer-events:none;transition:opacity .2s,transform .2s,visibility 0s .2s}
+  .tp-pop.show{opacity:1;visibility:visible;transform:translateY(0) scale(1);pointer-events:auto;transition-delay:0s}
+  .tp-pop.show.up{transform:translateY(0) scale(1)}
+  .dp-pop.show.up{transform:translateY(0) scale(1)}
   .tp-col{display:flex;flex-direction:column;max-height:220px;overflow-y:auto;width:62px;scrollbar-width:thin}
   .tp-col::-webkit-scrollbar{width:5px}.tp-col::-webkit-scrollbar-thumb{background:var(--sage-tint);border-radius:3px}
   .tp-col .lbl{position:sticky;top:0;background:#fdf6f0;text-align:center;font-size:10px;letter-spacing:.1em;
@@ -697,7 +720,9 @@ async function enterApp(){
     mostrarTrocaSenha();
     return;
   }
-  $('#userLabel').textContent = perfil.nome || 'Admin';
+  // o selo mostra o PAPEL; o nome fica como dica (title) e para leitor de tela
+  $('#userLabel').textContent = 'Admin';
+  if(perfil.nome){ $('#userLabel').title = perfil.nome; $('#userLabel').setAttribute('aria-label','Admin: '+perfil.nome); }
   $('#loginScreen').classList.add('hidden');
   $('#app').classList.remove('hidden');
   loadPsicologos();
@@ -1206,28 +1231,97 @@ $('#btnCriarUsuario').addEventListener('click', async ()=>{
   toast('Usuário criado com sucesso.');
 });
 
+// ===================== POPOVERS (date/time picker) =====================
+// O popover é renderizado direto no <body> com position:fixed, posicionado a partir do campo.
+// Assim ele escapa do contexto de empilhamento dos cards (backdrop-filter) e dos modais,
+// e pode abrir para cima quando não há espaço embaixo.
+const Pop=(()=>{
+  let atual=null; // { pop, field, close }
+  function place(pop,field){
+    const r=field.getBoundingClientRect(), m=8, vw=document.documentElement.clientWidth, vh=innerHeight;
+    const w=pop.offsetWidth, h=pop.offsetHeight;
+    const below=vh-r.bottom-m, above=r.top-m;
+    const up=h+8>below && above>below;            // abre para cima se não cabe embaixo e há mais espaço em cima
+    let top=up ? r.top-8-h : r.bottom+8;
+    top=Math.max(m,Math.min(top,vh-h-m));
+    let left=r.left;
+    if(left+w>vw-m) left=r.right-w;                // perto da borda direita: alinha pela direita do campo
+    left=Math.max(m,Math.min(left,vw-w-m));
+    pop.style.top=Math.round(top)+'px'; pop.style.left=Math.round(left)+'px';
+    pop.classList.toggle('up',up);
+  }
+  function open(pop,field,close){
+    if(atual&&atual.pop!==pop) atual.close();
+    atual={pop,field,close};
+    pop.classList.add('show'); field.classList.add('open'); field.setAttribute('aria-expanded','true');
+    place(pop,field);
+  }
+  function close(pop,field){
+    pop.classList.remove('show','up'); field.classList.remove('open'); field.setAttribute('aria-expanded','false');
+    if(atual&&atual.pop===pop) atual=null;
+  }
+  const reposition=()=>{ if(atual) place(atual.pop,atual.field); };
+  addEventListener('resize',reposition);
+  addEventListener('scroll',reposition,true);      // true: pega também a rolagem do modal
+  // clique/toque fora fecha (pointerdown: antes de o conteúdo do popover ser re-renderizado)
+  document.addEventListener('pointerdown',e=>{
+    if(atual&&!atual.pop.contains(e.target)&&!atual.field.contains(e.target)) atual.close();
+  },true);
+  return { open, close, isOpen:()=>!!atual, current:()=>atual, closeAll:()=>{ if(atual) atual.close(); } };
+})();
+
+// liga o <label for="id"> ao botão visível (o input original vira hidden)
+function ligarLabel(input,field,txtId,padrao){
+  const label=document.querySelector(`label[for="${input.id}"]`);
+  field.id=input.id+'-btn';
+  if(label){
+    label.htmlFor=field.id;                       // clicar no rótulo abre o picker
+    if(!label.id) label.id=input.id+'-lbl';
+    field.setAttribute('aria-labelledby',label.id+' '+txtId);
+    return label.textContent.trim();
+  }
+  field.setAttribute('aria-label',padrao);
+  return padrao;
+}
+// prende o Tab dentro do popover aberto (padrão de date picker em diálogo)
+function prenderTab(pop,e){
+  const els=[...pop.querySelectorAll('button:not([disabled])')].filter(b=>b.tabIndex>=0);
+  if(!els.length) return;
+  const i=els.indexOf(document.activeElement);
+  e.preventDefault();
+  els[(i+(e.shiftKey?-1:1)+els.length)%els.length].focus();
+}
+
 // ===================== DATE PICKER PRÓPRIO =====================
-(function(){
+const DatePicker=(()=>{
   const MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
   const DOWS=['D','S','T','Q','Q','S','S'];
+  const DOWS_EXT=['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
   const DIASEM=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
   const p2=n=>String(n).padStart(2,'0');
   const fmtISO=d=>d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
-  const fmtBR=iso=>{if(!iso)return'';const[y,m,d]=iso.split('-').map(Number);const dt=new Date(y,m-1,d);
-    return `${DIASEM[dt.getDay()]}, ${p2(d)}/${p2(m)}/${y}`;};
+  const parse=iso=>{const[y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d);};
+  const fmtBR=iso=>{if(!iso)return'';const dt=parse(iso);return `${DIASEM[dt.getDay()]}, ${p2(dt.getDate())}/${p2(dt.getMonth()+1)}/${dt.getFullYear()}`;};
 
   function build(input){
-    // esconde o input original, mantém id/value/eventos
     input.type='hidden';
     const dp=document.createElement('div'); dp.className='dp';
     const field=document.createElement('button'); field.type='button'; field.className='dp-field';
-    field.innerHTML=`<span class="txt ph">Selecione a data</span>
-      <svg class="cal-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`;
+    const txtId=input.id+'-txt';
+    field.innerHTML=`<span class="txt ph" id="${txtId}">Selecione a data</span>
+      <svg class="cal-ico" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`;
+    field.setAttribute('aria-haspopup','dialog'); field.setAttribute('aria-expanded','false');
+    const nome=ligarLabel(input,field,txtId,'Data');
     const pop=document.createElement('div'); pop.className='dp-pop';
-    input.parentNode.insertBefore(dp,input); dp.appendChild(input); dp.appendChild(field); dp.appendChild(pop);
+    pop.setAttribute('role','dialog'); pop.setAttribute('aria-label',nome+': escolher data');
+    input.parentNode.insertBefore(dp,input); dp.appendChild(input); dp.appendChild(field);
+    document.body.appendChild(pop);
 
     let view=new Date(); view.setDate(1);
+    let foco=null; // ISO do dia com foco (navegação por teclado)
     const txt=field.querySelector('.txt');
+    const minISO=()=>input.getAttribute('min')||'';
+    const desabilitado=iso=>!!minISO()&&iso<minISO();
 
     function refreshField(){
       if(input.value){ txt.textContent=fmtBR(input.value); txt.classList.remove('ph'); }
@@ -1235,115 +1329,160 @@ $('#btnCriarUsuario').addEventListener('click', async ()=>{
     }
     function render(){
       const y=view.getFullYear(), m=view.getMonth();
-      const first=new Date(y,m,1).getDay();
-      const dim=new Date(y,m+1,0).getDate();
+      const first=new Date(y,m,1).getDay(), dim=new Date(y,m+1,0).getDate();
       const todayISO=fmtISO(new Date());
+      const prevOff=!!minISO()&&fmtISO(new Date(y,m,0))<minISO(); // mês anterior inteiro no passado
       let h=`<div class="dp-head">
-        <button type="button" class="dp-nav prev">‹</button>
-        <span class="mes">${MESES[m]} ${y}</span>
-        <button type="button" class="dp-nav next">›</button></div>
-        <div class="dp-dows">${DOWS.map(d=>`<span>${d}</span>`).join('')}</div>
+        <button type="button" class="dp-nav prev" aria-label="Mês anterior"${prevOff?' disabled':''}>‹</button>
+        <span class="mes" aria-live="polite">${MESES[m]} ${y}</span>
+        <button type="button" class="dp-nav next" aria-label="Próximo mês">›</button></div>
+        <div class="dp-dows" aria-hidden="true">${DOWS.map(d=>`<span>${d}</span>`).join('')}</div>
         <div class="dp-days">`;
-      for(let i=0;i<first;i++) h+=`<span class="dp-day empty"></span>`;
+      for(let i=0;i<first;i++) h+=`<span class="dp-day empty" aria-hidden="true"></span>`;
       for(let d=1;d<=dim;d++){
-        const iso=`${y}-${p2(m+1)}-${p2(d)}`;
+        const iso=`${y}-${p2(m+1)}-${p2(d)}`, off=desabilitado(iso), dt=new Date(y,m,d);
         let c='dp-day';
         if(iso===input.value)c+=' sel';
         if(iso===todayISO)c+=' today';
-        h+=`<button type="button" class="${c}" data-iso="${iso}">${d}</button>`;
+        if(off)c+=' muted';
+        const label=`${DOWS_EXT[dt.getDay()]}, ${d} de ${MESES[m]} de ${y}${iso===todayISO?' (hoje)':''}`;
+        h+=`<button type="button" class="${c}" data-iso="${iso}" tabindex="${iso===foco?0:-1}" aria-label="${label}"`
+          +`${iso===input.value?' aria-pressed="true"':''}${iso===todayISO?' aria-current="date"':''}${off?' disabled':''}>${d}</button>`;
       }
       h+=`</div>`;
       pop.innerHTML=h;
-      pop.querySelector('.prev').onclick=e=>{e.stopPropagation();view.setMonth(view.getMonth()-1);render();};
-      pop.querySelector('.next').onclick=e=>{e.stopPropagation();view.setMonth(view.getMonth()+1);render();};
-      pop.querySelectorAll('.dp-day[data-iso]').forEach(b=>b.onclick=e=>{
-        e.stopPropagation();
-        input.value=b.dataset.iso;
-        input.dispatchEvent(new Event('change',{bubbles:true}));
-        refreshField(); close();
-      });
+      pop.querySelector('.prev').onclick=()=>mudarMes(-1);
+      pop.querySelector('.next').onclick=()=>mudarMes(1);
+      pop.querySelectorAll('.dp-day[data-iso]').forEach(b=>b.onclick=()=>{ if(!b.disabled) escolher(b.dataset.iso); });
+    }
+    function mudarMes(n){
+      view.setMonth(view.getMonth()+n);
+      // mantém o foco num dia válido do novo mês
+      const dim=new Date(view.getFullYear(),view.getMonth()+1,0).getDate();
+      const dia=Math.min(foco?parse(foco).getDate():1,dim);
+      foco=fmtISO(new Date(view.getFullYear(),view.getMonth(),dia));
+      if(desabilitado(foco)) foco=minISO();
+      render();
+      if(Pop.isOpen()) Pop.open(pop,field,close); // reposiciona (a altura pode mudar)
+    }
+    function focarDia(iso){
+      if(desabilitado(iso)) return;
+      foco=iso; const d=parse(iso);
+      if(d.getMonth()!==view.getMonth()||d.getFullYear()!==view.getFullYear()){ view=new Date(d.getFullYear(),d.getMonth(),1); render(); Pop.open(pop,field,close); }
+      else pop.querySelectorAll('.dp-day[data-iso]').forEach(b=>b.tabIndex=b.dataset.iso===iso?0:-1);
+      const b=pop.querySelector(`.dp-day[data-iso="${iso}"]`); if(b) b.focus();
+    }
+    function escolher(iso){
+      input.value=iso;
+      input.dispatchEvent(new Event('change',{bubbles:true}));
+      refreshField(); close(); field.focus();
     }
     function open(){
-      if(input.value){const[y,m]=input.value.split('-').map(Number);view=new Date(y,m-1,1);}
-      render(); pop.classList.add('show'); field.classList.add('open');
-      // se o popover sairia da tela pela direita, alinha pela direita
-      requestAnimationFrame(()=>{
-        pop.classList.remove('right');
-        const r=pop.getBoundingClientRect();
-        if(r.right>window.innerWidth-8) pop.classList.add('right');
-      });
+      const base=input.value||fmtISO(new Date());
+      foco=desabilitado(base)?minISO():base;
+      const d=parse(foco); view=new Date(d.getFullYear(),d.getMonth(),1);
+      render(); Pop.open(pop,field,close);
+      const b=pop.querySelector(`.dp-day[data-iso="${foco}"]`); if(b) b.focus({preventScroll:true});
     }
-    function close(){ pop.classList.remove('show'); field.classList.remove('open'); }
-    field.onclick=e=>{e.stopPropagation(); pop.classList.contains('show')?close():open();};
-    document.addEventListener('click',e=>{ if(!dp.contains(e.target)) close(); });
-    // sincroniza se o JS setar value programaticamente
-    const obs=new MutationObserver(refreshField);
-    // fallback: também expõe refresh via evento custom
+    function close(){ Pop.close(pop,field); }
+    field.addEventListener('click',()=>{ pop.classList.contains('show')?close():open(); });
+    pop.addEventListener('keydown',e=>{
+      if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); close(); field.focus(); return; }
+      if(e.key==='Tab'){ prenderTab(pop,e); return; }
+      const dia=e.target.closest&&e.target.closest('.dp-day[data-iso]'); if(!dia) return;
+      const d=parse(dia.dataset.iso), passo={ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7}[e.key];
+      if(passo){ e.preventDefault(); d.setDate(d.getDate()+passo); focarDia(fmtISO(d)); }
+      else if(e.key==='PageUp'||e.key==='PageDown'){ e.preventDefault(); d.setMonth(d.getMonth()+(e.key==='PageUp'?-1:1)); focarDia(fmtISO(d)); }
+      else if(e.key==='Home'||e.key==='End'){ e.preventDefault(); d.setDate(d.getDate()+(e.key==='Home'?-d.getDay():6-d.getDay())); focarDia(fmtISO(d)); }
+    });
+    // sincroniza quando o JS seta value programaticamente
     input.addEventListener('dp-refresh',refreshField);
     refreshField();
   }
-
-  function initAll(){ document.querySelectorAll('input[type="date"]').forEach(build); }
-  // inicializa quando o DOM estiver pronto
-  if(document.readyState!=='loading') initAll(); else document.addEventListener('DOMContentLoaded',initAll);
+  return { initAll:()=>document.querySelectorAll('input[type="date"]').forEach(build) };
 })();
 
-
-// ===== TIME PICKER PRÓPRIO =====
-(function(){
+// ===================== TIME PICKER PRÓPRIO =====================
+const TimePicker=(()=>{
   const p2=n=>String(n).padStart(2,'0');
   function build(input){
-    const step = parseInt(input.getAttribute('step')||'0',10);
-    const minStep = step && step%60===0 ? step/60 : 5; // minutos de 5 em 5 (ou pelo step)
+    const step=parseInt(input.getAttribute('step')||'0',10);
+    const minStep=step && step%60===0 ? step/60 : 5; // minutos de 5 em 5 (ou pelo step)
     input.type='hidden';
     const tp=document.createElement('div'); tp.className='tp';
     const field=document.createElement('button'); field.type='button'; field.className='tp-field';
-    field.innerHTML=`<span class="txt ph">--:--</span>
-      <svg class="clock" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>`;
+    const txtId=input.id+'-txt';
+    field.innerHTML=`<span class="txt ph" id="${txtId}">--:--</span>
+      <svg class="clock" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>`;
+    field.setAttribute('aria-haspopup','dialog'); field.setAttribute('aria-expanded','false');
+    const nome=ligarLabel(input,field,txtId,'Horário');
     const pop=document.createElement('div'); pop.className='tp-pop';
-    input.parentNode.insertBefore(tp,input); tp.appendChild(input); tp.appendChild(field); tp.appendChild(pop);
+    pop.setAttribute('role','dialog'); pop.setAttribute('aria-label',nome+': escolher horário');
+    input.parentNode.insertBefore(tp,input); tp.appendChild(input); tp.appendChild(field);
+    document.body.appendChild(pop);
     const txt=field.querySelector('.txt');
 
     function refresh(){
       if(input.value){ txt.textContent=input.value.slice(0,5); txt.classList.remove('ph'); }
       else{ txt.textContent='--:--'; txt.classList.add('ph'); }
     }
-    function render(){
+    function render(focoCol){
       const cur=input.value?input.value.slice(0,5):'';
       const [ch,cm]=cur?cur.split(':'):['',''];
-      let h='<div class="tp-col hcol"><span class="lbl">h</span>';
-      for(let i=0;i<24;i++){const v=p2(i);h+=`<button type="button" class="tp-opt${v===ch?' sel':''}" data-h="${v}">${v}</button>`;}
-      h+='</div><div class="tp-col mcol"><span class="lbl">min</span>';
-      for(let i=0;i<60;i+=minStep){const v=p2(i);h+=`<button type="button" class="tp-opt${v===cm?' sel':''}" data-m="${v}">${v}</button>`;}
+      const opt=(tipo,v,sel,unid)=>`<button type="button" class="tp-opt${sel?' sel':''}" data-${tipo}="${v}" tabindex="-1" aria-label="${+v} ${unid}"${sel?' aria-pressed="true"':''}>${v}</button>`;
+      let h='<div class="tp-col hcol" role="group" aria-label="Horas"><span class="lbl" aria-hidden="true">h</span>';
+      for(let i=0;i<24;i++){const v=p2(i);h+=opt('h',v,v===ch,+v===1?'hora':'horas');}
+      h+='</div><div class="tp-col mcol" role="group" aria-label="Minutos"><span class="lbl" aria-hidden="true">min</span>';
+      for(let i=0;i<60;i+=minStep){const v=p2(i);h+=opt('m',v,v===cm,+v===1?'minuto':'minutos');}
       h+='</div>';
       pop.innerHTML=h;
-      pop.querySelectorAll('[data-h]').forEach(b=>b.onclick=e=>{e.stopPropagation();pick(b.dataset.h,null);});
-      pop.querySelectorAll('[data-m]').forEach(b=>b.onclick=e=>{e.stopPropagation();pick(null,b.dataset.m);});
-      // rola até o selecionado
-      requestAnimationFrame(()=>{
-        const sh=pop.querySelector('.hcol .sel'),sm=pop.querySelector('.mcol .sel');
-        if(sh)sh.scrollIntoView({block:'center'}); if(sm)sm.scrollIntoView({block:'center'});
+      // um item tabulável por coluna: o selecionado (ou o primeiro)
+      pop.querySelectorAll('.tp-col').forEach(col=>{(col.querySelector('.sel')||col.querySelector('.tp-opt')).tabIndex=0;});
+      pop.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>pick(b.dataset.h,null));
+      pop.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>pick(null,b.dataset.m));
+      // rola até o selecionado (só dentro da coluna, sem rolar a página)
+      pop.querySelectorAll('.tp-col').forEach(col=>{
+        const s=col.querySelector('.sel'); if(s) col.scrollTop=s.offsetTop-col.clientHeight/2+s.offsetHeight/2;
       });
+      if(focoCol){ const b=pop.querySelector(`.${focoCol} .tp-opt[tabindex="0"]`); if(b) b.focus({preventScroll:true}); }
     }
     function pick(h,m){
       let [ch,cm]=(input.value?input.value.slice(0,5):'08:00').split(':');
       if(h!==null)ch=h; if(m!==null)cm=m;
       input.value=`${ch}:${cm}`;
       input.dispatchEvent(new Event('change',{bubbles:true}));
-      refresh(); render();
+      refresh(); render(h!==null?'hcol':'mcol');
     }
-    function open(){ render(); pop.classList.add('show'); field.classList.add('open');
-      requestAnimationFrame(()=>{pop.classList.remove('right');const r=pop.getBoundingClientRect();if(r.right>window.innerWidth-8)pop.classList.add('right');});
-    }
-    function close(){ pop.classList.remove('show'); field.classList.remove('open'); }
-    field.onclick=e=>{e.stopPropagation(); pop.classList.contains('show')?close():open();};
-    document.addEventListener('click',e=>{if(!tp.contains(e.target))close();});
+    function open(){ render('hcol'); Pop.open(pop,field,close); }
+    function close(){ Pop.close(pop,field); }
+    field.addEventListener('click',()=>{ pop.classList.contains('show')?close():open(); });
+    pop.addEventListener('keydown',e=>{
+      if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); close(); field.focus(); return; }
+      if(e.key==='Tab'){ prenderTab(pop,e); return; }
+      const b=e.target.closest&&e.target.closest('.tp-opt'); if(!b) return;
+      const col=b.parentElement, itens=[...col.querySelectorAll('.tp-opt')], i=itens.indexOf(b);
+      let alvo=null;
+      if(e.key==='ArrowDown') alvo=itens[Math.min(i+1,itens.length-1)];
+      else if(e.key==='ArrowUp') alvo=itens[Math.max(i-1,0)];
+      else if(e.key==='Home') alvo=itens[0];
+      else if(e.key==='End') alvo=itens[itens.length-1];
+      else if(e.key==='ArrowRight'||e.key==='ArrowLeft'){
+        const outra=pop.querySelector(col.classList.contains('hcol')?'.mcol':'.hcol');
+        const t=outra.querySelector('.tp-opt[tabindex="0"]'); if(t){ e.preventDefault(); t.focus(); } return;
+      }
+      if(alvo){ e.preventDefault(); itens.forEach(x=>x.tabIndex=-1); alvo.tabIndex=0; alvo.focus(); }
+    });
     input.addEventListener('tp-refresh',refresh);
     refresh();
   }
-  function initAll(){ document.querySelectorAll('input[type="time"]').forEach(build); }
-  if(document.readyState!=='loading') initAll(); else document.addEventListener('DOMContentLoaded',initAll);
+  return { initAll:()=>document.querySelectorAll('input[type="time"]').forEach(build) };
 })();
+
+function initPickers(){
+  if(typeof DatePicker!=='undefined') DatePicker.initAll();
+  TimePicker.initAll();
+}
+if(document.readyState!=='loading') initPickers(); else document.addEventListener('DOMContentLoaded',initPickers);
 
 checkSession();
 </script>
