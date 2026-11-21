@@ -886,30 +886,20 @@ function travaRegistro(item,on){item.querySelectorAll('button,textarea').forEach
 async function salvarEvolucao(item){
   const id=item.dataset.id;
   const b=item.querySelector('.btn');
-  // 1ª etapa (só se ainda não houver evolução gravada): insere a evolução
-  if(item.dataset.evo!=='1'){
+  let error=null;
+  if(item.dataset.evo==='1'){
+    // legado: evolução já gravada (pelo fluxo antigo de 2 etapas), falta só o status — uma única operação
+    travaRegistro(item,true);b.textContent='Salvando…';
+    try{ ({error}=await sb.from('agendamentos').update({status:'realizada'}).eq('id',id)); }catch(e){ error=e; }
+    if(error){travaRegistro(item,false);b.textContent=TXT_STATUS;toast('Erro ao marcar como realizada: '+error.message,true);return;}
+  }else{
     const ok=item.querySelector('.chip-ok').classList.contains('sel-ok'), no=item.querySelector('.chip-no').classList.contains('sel-no');
     if(!ok&&!no){ toast('Marque se o paciente compareceu ou faltou.',true); item.querySelector('.chip-ok').focus(); return; }
-    const compareceu=ok;
     const evo=item.querySelector('textarea').value.trim();
     travaRegistro(item,true);b.textContent='Salvando…';
-    let e1=null;
-    try{ ({error:e1}=await sb.from('sessoes_evolucao').insert({
-      agendamento_id:id,psicologo_id:state.psicologoId,compareceu,evolucao:evo||null
-    })); }catch(e){ e1=e; }
-    if(e1){travaRegistro(item,false);b.textContent='Salvar registro';toast('Erro ao salvar: '+e1.message,true);return;}
-    item.dataset.evo='1';
-  }else{ travaRegistro(item,true);b.textContent='Salvando…'; }
-  // 2ª etapa: marca o agendamento como realizado
-  let e2=null;
-  try{ ({error:e2}=await sb.from('agendamentos').update({status:'realizada'}).eq('id',id)); }catch(e){ e2=e; }
-  if(e2){
-    // a evolução está gravada mas o status não: a sessão FICA na lista, só com a ação de concluir o status
-    item.querySelector('.fb-controls')?.remove(); item.querySelector('textarea')?.remove();
-    if(!item.querySelector('.fb-aviso')) item.querySelector('.fb-save').insertAdjacentHTML('beforebegin',AVISO_STATUS);
-    travaRegistro(item,false); b.textContent=TXT_STATUS; b.focus();
-    toast('Evolução salva, mas a consulta não foi marcada como realizada ('+e2.message+'). Use "'+TXT_STATUS+'" para concluir.',true);
-    return;
+    // evolução + status 'realizada' numa única transação no banco: grava tudo ou nada
+    try{ ({error}=await sb.rpc('registrar_sessao',{p_agendamento_id:id,p_compareceu:ok,p_evolucao:evo||null})); }catch(e){ error=e; }
+    if(error){travaRegistro(item,false);b.textContent='Salvar registro';toast('Erro ao salvar o registro (nada foi gravado): '+error.message,true);return;}
   }
   toast('Registro salvo.');
   item.remove(); loadFeedbackCount();
