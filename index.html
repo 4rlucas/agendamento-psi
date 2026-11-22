@@ -415,7 +415,7 @@
 <div id="loginScreen" class="login-screen">
   <form class="login-card" id="loginForm" novalidate>
     <h1 class="login-brand">Cuidar <i>é amar</i></h1>
-    <p class="sub">Painel administrativo · acesso da recepção</p>
+    <p class="sub">Acesso da recepção e dos profissionais</p>
     <div class="field">
       <label for="email">E-mail</label>
       <input id="email" type="email" autocomplete="username" placeholder="voce@clinica.com">
@@ -679,9 +679,14 @@
 // ===================== CONFIG =====================
 const SUPABASE_URL = 'https://toayvpcoxighrcnvqrwj.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvYXl2cGNveGlnaHJjbnZxcndqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NTI0MTcsImV4cCI6MjEwMDAyODQxN30.aE9YEIuBMnBdc-JSiFDe9OwFBttGWfc51CbwMbzVKHE';
+// sessão ÚNICA, compartilhada com psicologo.html: o login é feito aqui e o psicólogo
+// é redirecionado já autenticado (as duas páginas precisam usar a mesma storageKey)
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
-  auth:{ storageKey:'sb-agenda-recepcao' }  // sessão isolada do painel do psicólogo
+  auth:{ storageKey:'sb-agenda' }
 });
+// limpa sessões das chaves antigas (uma por painel), que não são mais usadas
+try{ ['sb-agenda-recepcao','sb-agenda-psicologo'].forEach(k=>localStorage.removeItem(k)); }catch(e){}
+const PAINEL_PSI = 'psicologo.html';
 
 // ===================== ESTADO =====================
 const state = { psicologo:null, data:null, hora:null, duracao:50 };
@@ -733,7 +738,7 @@ async function enterApp(){
 
   // confirma que é recepção — sem .single() pra ver o erro cru
   const { data:perfis, error } = await sb
-    .from('perfis').select('nome,papel,senha_provisoria').eq('id', uid);
+    .from('perfis').select('nome,papel,psicologo_id,senha_provisoria').eq('id', uid);
   console.log('Resposta perfis:', { perfis, error });
 
   if(error){
@@ -746,14 +751,21 @@ async function enterApp(){
     await sb.auth.signOut(); return;
   }
   const perfil = perfis[0];
-  if(perfil.papel!=='recepcao'){
-    toast('Este acesso é da recepção.',true); await sb.auth.signOut(); return;
+  const ehPsi = perfil.papel==='psicologo';
+  if(perfil.papel!=='recepcao' && !ehPsi){
+    toast('Perfil sem acesso definido.',true); await sb.auth.signOut(); return;
   }
-  // 1º login: força troca de senha antes de entrar
+  // psicólogo sem cadastro vinculado: o painel dele recusaria e devolveria para cá (laço)
+  if(ehPsi && !perfil.psicologo_id){
+    toast('Cadastro de profissional incompleto. Fale com a recepção.',true); await sb.auth.signOut(); return;
+  }
+  // 1º login (qualquer papel): troca de senha aqui, ANTES de entrar/redirecionar
   if(perfil.senha_provisoria){
     mostrarTrocaSenha();
     return;
   }
+  // psicólogo: vai para o painel dele, já logado (mesma sessão)
+  if(ehPsi){ location.replace(PAINEL_PSI); return; }
   // o selo mostra o PAPEL; o nome fica como dica (title) e para leitor de tela
   $('#userLabel').textContent = 'Admin';
   if(perfil.nome){ $('#userLabel').title = perfil.nome; $('#userLabel').setAttribute('aria-label','Admin: '+perfil.nome); }
@@ -803,6 +815,8 @@ $('#trocaForm').addEventListener('submit',e=>e.preventDefault());
 $('#btnLogout').addEventListener('click', async ()=>{
   await sb.auth.signOut(); location.reload();
 });
+// aviso deixado pelo painel do psicólogo ao devolver alguém para cá
+try{ const m=sessionStorage.getItem('loginMsg'); if(m){ sessionStorage.removeItem('loginMsg'); $('#loginErr').textContent=m; } }catch(e){}
 
 // ===================== PASSO 1: PSICÓLOGOS =====================
 async function loadPsicologos(){

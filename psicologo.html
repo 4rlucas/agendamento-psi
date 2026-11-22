@@ -348,18 +348,14 @@
 </head>
 <body>
 
-<!-- LOGIN -->
+<!-- ENTRADA: o login é feito no index.html, que redireciona para cá já autenticado.
+     Esta tela só aparece enquanto a sessão é verificada; sem sessão, volta ao index. -->
 <div id="loginScreen" class="login-screen">
-  <form class="login-card" id="loginForm" novalidate>
+  <div class="login-card" role="status">
     <h1 class="login-brand">Cuidar <i>é amar</i></h1>
-    <p class="sub">Agenda do profissional</p>
-    <div class="field"><label for="email">E-mail</label>
-      <input id="email" type="email" autocomplete="username" placeholder="voce@clinica.com"></div>
-    <div class="field"><label for="senha">Senha</label>
-      <input id="senha" type="password" autocomplete="current-password" placeholder="••••••••"></div>
-    <button id="btnLogin" type="submit" class="btn btn-primary" style="width:100%">Entrar</button>
-    <div id="loginErr" class="err" role="alert"></div>
-  </form>
+    <p class="sub">Verificando seu acesso…</p>
+    <a class="btn btn-primary" href="./" style="display:block;width:100%;text-align:center;text-decoration:none">Ir para o login</a>
+  </div>
 </div>
 
 <!-- TROCA DE SENHA (1º login) -->
@@ -509,9 +505,12 @@
 // ===== CONFIG =====
 const SUPABASE_URL='https://toayvpcoxighrcnvqrwj.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvYXl2cGNveGlnaHJjbnZxcndqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NTI0MTcsImV4cCI6MjEwMDAyODQxN30.aE9YEIuBMnBdc-JSiFDe9OwFBttGWfc51CbwMbzVKHE';
+// sessão ÚNICA, compartilhada com o index.html (onde é feito o login): mesma storageKey
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON,{
-  auth:{ storageKey:'sb-agenda-psicologo' }  // sessão isolada da recepção
+  auth:{ storageKey:'sb-agenda' }
 });
+try{ ['sb-agenda-recepcao','sb-agenda-psicologo'].forEach(k=>localStorage.removeItem(k)); }catch(e){}
+const LOGIN='./'; // index.html: a porta de entrada única
 
 const $=s=>document.querySelector(s);
 const $$=s=>document.querySelectorAll(s);
@@ -535,15 +534,23 @@ function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
 function hhmm(t){return t.slice(0,5);}
 
 // ===== AUTH =====
-async function checkSession(){const{data:{session}}=await sb.auth.getSession();if(session)await enterApp();}
+// sem sessão → login no index; com sessão inválida/sem acesso → encerra e volta ao index com o aviso
+async function checkSession(){const{data:{session}}=await sb.auth.getSession();if(session)await enterApp();else location.replace(LOGIN);}
+async function voltarAoLogin(msg){
+  await sb.auth.signOut();
+  try{ if(msg) sessionStorage.setItem('loginMsg',msg); }catch(e){}
+  location.replace(LOGIN);
+}
 async function enterApp(){
   const{data:ud,error:ue}=await sb.auth.getUser();
-  if(ue||!ud?.user){toast('Sessão inválida.',true);await sb.auth.signOut();return;}
+  if(ue||!ud?.user){await voltarAoLogin('Sessão expirada. Faça login novamente.');return;}
   const{data:perfis,error}=await sb.from('perfis').select('nome,papel,psicologo_id,senha_provisoria').eq('id',ud.user.id);
-  if(error){toast('Erro ao ler perfil: '+error.message,true);await sb.auth.signOut();return;}
-  if(!perfis||!perfis.length){toast('Perfil não encontrado.',true);await sb.auth.signOut();return;}
+  if(error){await voltarAoLogin('Erro ao ler perfil: '+error.message);return;}
+  if(!perfis||!perfis.length){await voltarAoLogin('Perfil não encontrado.');return;}
   const p=perfis[0];
-  if(p.papel!=='psicologo'||!p.psicologo_id){toast('Este acesso é do profissional.',true);await sb.auth.signOut();return;}
+  // recepção aqui: volta ao index, que abre o painel admin (a sessão continua válida)
+  if(p.papel==='recepcao'){location.replace(LOGIN);return;}
+  if(p.papel!=='psicologo'||!p.psicologo_id){await voltarAoLogin('Este acesso não tem um cadastro de profissional vinculado.');return;}
   // 1º login: força troca de senha antes de entrar
   if(p.senha_provisoria){ mostrarTrocaSenha(); return; }
   state.psicologoId=p.psicologo_id; state.nome=p.nome||'Profissional';
@@ -578,19 +585,9 @@ $('#btnTrocarSenha').addEventListener('click', async ()=>{
   await enterApp();
 });
 
-$('#btnLogin').addEventListener('click',async()=>{
-  const email=$('#email').value.trim(),senha=$('#senha').value;$('#loginErr').textContent='';
-  if(!email||!senha){$('#loginErr').textContent='Preencha e-mail e senha.';return;}
-  const b=$('#btnLogin');b.disabled=true;b.textContent='Entrando…';
-  const{error}=await sb.auth.signInWithPassword({email,password:senha});
-  b.disabled=false;b.textContent='Entrar';
-  if(error){$('#loginErr').textContent='E-mail ou senha inválidos.';return;}
-  await enterApp();
-});
 // Enter em qualquer campo envia (o botão é type=submit; a lógica fica no click do botão)
-$('#loginForm').addEventListener('submit',e=>e.preventDefault());
 $('#trocaForm').addEventListener('submit',e=>e.preventDefault());
-$('#btnLogout').addEventListener('click',async()=>{await sb.auth.signOut();location.reload();});
+$('#btnLogout').addEventListener('click',async()=>{await sb.auth.signOut();location.replace(LOGIN);});
 
 // ===== TABS =====
 $$('.tab').forEach(t=>t.addEventListener('click',()=>{
