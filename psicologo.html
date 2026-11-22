@@ -282,6 +282,12 @@
     .tab .tab-ico svg{position:relative;width:22px;height:22px}
     /* rótulo curto; "/ """ = texto alternativo vazio (o leitor de tela fica só com o nome completo) */
     .tab::after{content:attr(data-curto);content:attr(data-curto) / "";display:block;margin-top:3px;font-size:11.5px;line-height:1.15}
+    /* rótulo curto que NÃO está no nome completo (Config ≠ Configurações): vai no ::before, SEM texto
+       alternativo vazio, então entra no nome acessível e o nome começa pelo texto visível ("Config
+       Configurações") — WCAG 2.5.3 (rótulo no nome); order:1 o põe embaixo do ícone */
+    .tab[data-tab=config]::after{content:none}
+    .tab[data-tab=config]::before{content:attr(data-curto);display:block;order:1;
+      margin-top:3px;font-size:11.5px;line-height:1.15}
     .tab.active{color:var(--sage-deep);border-color:transparent;font-weight:600}
     .tab.active .tab-ico{color:#fff;transform:translateY(-15px)}
     .tab.active .tab-ico::before{opacity:1;transform:scale(1)}
@@ -783,6 +789,41 @@ $$('.tab').forEach(t=>t.addEventListener('click',()=>{
   if(t.dataset.tab==='historico')loadHistorico();
   if(t.dataset.tab==='config')loadAgenda();
 }));
+guardaBarraMobile('.tabs','.tab');
+
+// ===== MOBILE: barra inferior fixa =====
+// (1) a aba escolhida abre do topo, sem herdar a rolagem da anterior; (2) o elemento focado (Tab, setas,
+// foco devolvido ao fechar modal) nunca fica atrás da barra nem do header fixo. Só age em ≤768px, onde a
+// barra existe; fica fora do handler de troca de aba de propósito (a lógica de abas não muda).
+function guardaBarraMobile(barSel,abaSel){
+  const mq=matchMedia('(max-width:768px)'), bar=document.querySelector(barSel), header=document.querySelector('header');
+  document.querySelectorAll(abaSel).forEach(t=>t.addEventListener('click',()=>{
+    if(mq.matches) window.scrollTo({top:0,behavior:'instant'});
+  }));
+  const ajusta=el=>{
+    if(!mq.matches||document.activeElement!==el) return;
+    const rb=bar.getBoundingClientRect(); if(!rb.height) return;   // barra oculta (ex.: tela de entrada)
+    const ic=bar.querySelector('.active .tab-ico');                  // o círculo da aba ativa sobe acima da barra
+    const topo=Math.min(rb.top, ic?ic.getBoundingClientRect().top+ic.getBoundingClientRect().height/2-27:rb.top)-12;
+    const fixo=header&&/sticky|fixed/.test(getComputedStyle(header).position);
+    const piso=(fixo?Math.max(0,header.getBoundingClientRect().bottom):0)+12;
+    const r=el.getBoundingClientRect();
+    if(!r.height&&!r.width) return;
+    let d=0;
+    if(r.bottom>topo) d=Math.min(r.bottom-topo, r.top-piso);       // desce a página, sem jogar o topo sob o header
+    else if(r.top<piso) d=r.top-piso;
+    if(d) window.scrollBy({top:d,behavior:'instant'});
+  };
+  // foco vindo de toque/clique não precisa de ajuste (o elemento tocado está visível) e rolar aí atrapalharia
+  // o picker, que abre no clique e se reposiciona a cada rolagem; o ajuste é para Tab, setas e foco devolvido
+  let toque=0; document.addEventListener('pointerdown',()=>{ toque=performance.now(); },true);
+  document.addEventListener('focusin',e=>{
+    const el=e.target;
+    if(performance.now()-toque<800) return;
+    if(!(el instanceof Element)||bar.contains(el)||el.closest('.modal-bg,.dp-pop,.tp-pop')) return;
+    requestAnimationFrame(()=>ajusta(el));    // depois da rolagem nativa do foco
+  });
+}
 
 // ===== GRADE =====
 async function loadGrade(){
