@@ -91,6 +91,8 @@
     margin-bottom:6px;letter-spacing:.01em;
   }
   .login-card p.sub{color:var(--ink-soft);font-size:14px;margin-bottom:28px}
+  /* nota discreta; tom um pouco mais escuro que --ink-soft porque é menor (≥4,5:1 medido sobre o vidro em 320px) */
+  .login-card p.login-nota{color:#6c4a3f;font-size:12.5px;line-height:1.45;text-align:center;margin-top:6px;text-wrap:balance}
   .login-brand i,.login-logo i{font-style:italic;font-weight:500;color:var(--sage)}
   .login-logo{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--ink);margin-bottom:14px;line-height:1}
   label{display:block;font-size:12px;font-weight:500;margin-bottom:7px;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase}
@@ -426,6 +428,8 @@
     </div>
     <button id="btnLogin" type="submit" class="btn btn-primary">Entrar</button>
     <div id="loginErr" class="err" role="alert"></div>
+    <!-- o sistema é feito para uma conta por navegador (ver docs/ARQUITETURA.md, "Limitação de uso") -->
+    <p class="login-nota">Cada pessoa entra com a própria conta, no próprio dispositivo.</p>
   </form>
 </div>
 
