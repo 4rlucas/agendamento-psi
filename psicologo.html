@@ -100,6 +100,8 @@
     margin-bottom:-1px;transition:color .2s,border-color .2s}
   .tab:hover{color:var(--ink)}
   .tab.active{color:var(--sage-deep);border-color:var(--sage);font-weight:500} /* texto 14px: sage-deep passa AA */
+  /* ícone e rótulo curto só existem na barra inferior do mobile */
+  .tab .tab-ico{display:none}
   .tab .badge{display:inline-block;background:var(--sage);color:#fff;font-size:11px;
     border-radius:40px;padding:1px 8px;margin-left:6px;font-weight:500}
 
@@ -253,12 +255,43 @@
   /* ================= RESPONSIVO ================= */
   @media (max-width:768px){
     .wrap{padding:0 16px}
-    main.wrap{padding-top:20px;padding-bottom:calc(60px + env(safe-area-inset-bottom,0px))}
+    /* fim da página: 60px de respiro + a barra inferior fixa (70px) + safe-area, para nada ficar escondido atrás dela */
+    main.wrap{padding-top:20px;padding-bottom:calc(130px + env(safe-area-inset-bottom,0px))}
     .appt-foot .btn-mover-sm{padding:10px 16px;min-height:40px}
     .greeting{font-size:30px;line-height:1.2} /* maior que o h2 dos cards (23px) */
-    /* abas rolam horizontalmente */
-    .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;gap:2px}
-    .tab{white-space:nowrap;padding:12px 13px}
+    /* ---- barra de navegação inferior (só mobile) ----
+       São os MESMOS botões de aba (mesmos data-*, mesmo handler de clique), só reposicionados no rodapé:
+       ícone + rótulo curto (data-curto, via ::after). O texto completo continua no botão com tamanho zero,
+       e é ele o nome lido pelo leitor de tela; no desktop o botão fica exatamente como era (mesmo nó de texto).
+       Altura: 6 + 58 + 6 = 70px + safe-area; o círculo da aba ativa sobe ~13px acima da barra. */
+    .tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;margin:0;overflow:visible;
+      display:grid;grid-template-columns:repeat(5,minmax(0,112px));justify-content:center;gap:2px;
+      padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));
+      background:rgba(250,238,231,.9);-webkit-backdrop-filter:blur(20px) saturate(1.3);backdrop-filter:blur(20px) saturate(1.3);
+      border-top:1px solid var(--glass-brd);border-bottom:none;box-shadow:0 -10px 30px rgba(68,48,42,.10)}
+    .tab{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:0;
+      min-height:58px;padding:4px 2px 6px;margin:0;border:none;border-radius:14px;
+      font-size:0;font-weight:500;line-height:1.15;color:var(--ink-soft);white-space:nowrap;
+      -webkit-tap-highlight-color:transparent}
+    .tab .tab-ico{position:relative;display:grid;place-items:center;width:44px;height:30px;
+      transition:transform .28s cubic-bezier(.2,.9,.3,1.2),color .2s}
+    /* círculo elevado da aba ativa (terracota), com um anel da cor da barra para "recortá-la" */
+    .tab .tab-ico::before{content:"";position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;
+      border-radius:50%;background:var(--sage);box-shadow:0 8px 18px rgba(154,64,38,.35),0 0 0 4px rgba(250,238,231,.95);
+      opacity:0;transform:scale(.6);transition:opacity .2s,transform .28s cubic-bezier(.2,.9,.3,1.2)}
+    .tab .tab-ico svg{position:relative;width:22px;height:22px}
+    /* rótulo curto; "/ """ = texto alternativo vazio (o leitor de tela fica só com o nome completo) */
+    .tab::after{content:attr(data-curto);content:attr(data-curto) / "";display:block;margin-top:3px;font-size:11.5px;line-height:1.15}
+    .tab.active{color:var(--sage-deep);border-color:transparent;font-weight:600}
+    .tab.active .tab-ico{color:#fff;transform:translateY(-15px)}
+    .tab.active .tab-ico::before{opacity:1;transform:scale(1)}
+    /* badge de pendências de Registros: no canto do ícone (acompanha o círculo quando a aba está ativa) */
+    .tab .badge{position:absolute;top:2px;left:calc(50% + 5px);margin:0;min-width:18px;height:18px;padding:0 5px;
+      font-size:10.5px;line-height:18px;text-align:center;box-shadow:0 0 0 2px rgba(250,238,231,.95);
+      transition:transform .28s cubic-bezier(.2,.9,.3,1.2)}
+    .tab.active .badge{transform:translate(9px,-17px)}
+    /* o toast sobe para não ficar em cima da barra (só quando o painel, e portanto a barra, está visível) */
+    body:has(#app:not(.hidden)) .toast{bottom:calc(92px + env(safe-area-inset-bottom,0px));padding-bottom:14px}
     /* inputs 16px evitam auto-zoom do iOS */
     input,select,textarea{font-size:16px;padding:12px 13px}
     .btn{padding:13px 18px;font-size:16px}
@@ -391,11 +424,11 @@
     <div class="greeting-sub">Gerencie sua agenda, consultas e registros de sessão.</div>
 
     <div class="tabs">
-      <button class="tab active" data-tab="agenda">Liberar agenda</button>
-      <button class="tab" data-tab="consultas">Minhas consultas</button>
-      <button class="tab" data-tab="feedback">Registros de sessão <span id="fbBadge" class="badge hidden">0</span></button>
-      <button class="tab" data-tab="historico">Histórico</button>
-      <button class="tab" data-tab="config">Configurações</button>
+      <button class="tab active" data-tab="agenda" data-curto="Agenda"><span class="tab-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M16 2.5v3M8 2.5v3M3 9.5h18M8 13.5h.01M12 13.5h.01M16 13.5h.01M8 17h.01M12 17h.01"/></svg></span>Liberar agenda</button>
+      <button class="tab" data-tab="consultas" data-curto="Consultas"><span class="tab-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6.5h11.5M9 12h11.5M9 17.5h11.5"/><path d="M4 6.5h.01M4 12h.01M4 17.5h.01" stroke-width="2.6"/></svg></span>Minhas consultas</button>
+      <button class="tab" data-tab="feedback" data-curto="Registros"><span class="tab-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 4h2A2.5 2.5 0 0 1 20 6.5v12a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 18.5v-12A2.5 2.5 0 0 1 6.5 4h2"/><rect x="8.5" y="2.5" width="7" height="3.5" rx="1"/><path d="M8.5 11.5h7M8.5 15.5h4.5"/></svg></span>Registros de sessão <span id="fbBadge" class="badge hidden">0</span></button>
+      <button class="tab" data-tab="historico" data-curto="Histórico"><span class="tab-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>Histórico</button>
+      <button class="tab" data-tab="config" data-curto="Config"><span class="tab-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.21 5.34L10.5 2.52L13.5 2.52L13.79 5.34L15.45 6.02L17.64 4.23L19.77 6.36L17.98 8.55L18.66 10.21L21.48 10.5L21.48 13.5L18.66 13.79L17.98 15.45L19.77 17.64L17.64 19.77L15.45 17.98L13.79 18.66L13.5 21.48L10.5 21.48L10.21 18.66L8.55 17.98L6.36 19.77L4.23 17.64L6.02 15.45L5.34 13.79L2.52 13.5L2.52 10.5L5.34 10.21L6.02 8.55L4.23 6.36L6.36 4.23L8.55 6.02Z"/><circle cx="12" cy="12" r="3"/></svg></span>Configurações</button>
     </div>
 
     <!-- ======= LIBERAR AGENDA ======= -->
