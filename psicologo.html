@@ -351,10 +351,15 @@
 <!-- ENTRADA: o login é feito no index.html, que redireciona para cá já autenticado.
      Esta tela só aparece enquanto a sessão é verificada; sem sessão, volta ao index. -->
 <div id="loginScreen" class="login-screen">
-  <div class="login-card" role="status">
+  <div class="login-card">
     <h1 class="login-brand">Cuidar <i>é amar</i></h1>
-    <p class="sub">Verificando seu acesso…</p>
-    <a class="btn btn-primary" href="./" style="display:block;width:100%;text-align:center;text-decoration:none">Ir para o login</a>
+    <p class="sub" id="entradaMsg" role="status">Verificando seu acesso…</p>
+    <!-- só aparece quando o acesso falha de forma repetida (erro estável, sem redirecionar de novo) -->
+    <div id="entradaAcoes" class="hidden" style="display:grid;gap:10px;margin-bottom:10px">
+      <button id="btnTentarDeNovo" type="button" class="btn btn-primary" style="width:100%">Tentar de novo</button>
+      <button id="btnSairEntrada" type="button" class="btn btn-ghost" style="width:100%">Sair desta conta</button>
+    </div>
+    <a class="btn btn-primary" id="lnkLogin" href="./" style="display:block;width:100%;text-align:center;text-decoration:none">Ir para o login</a>
   </div>
 </div>
 
@@ -506,8 +511,9 @@
 const SUPABASE_URL='https://toayvpcoxighrcnvqrwj.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvYXl2cGNveGlnaHJjbnZxcndqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NTI0MTcsImV4cCI6MjEwMDAyODQxN30.aE9YEIuBMnBdc-JSiFDe9OwFBttGWfc51CbwMbzVKHE';
 // sessão ÚNICA, compartilhada com o index.html (onde é feito o login): mesma storageKey
+const STORAGE_KEY='sb-agenda';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON,{
-  auth:{ storageKey:'sb-agenda' }
+  auth:{ storageKey:STORAGE_KEY }
 });
 try{ ['sb-agenda-recepcao','sb-agenda-psicologo'].forEach(k=>localStorage.removeItem(k)); }catch(e){}
 const LOGIN='./'; // index.html: a porta de entrada única
@@ -526,68 +532,213 @@ const MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','de
 let state={ psicologoId:null, nome:null, grade:{inicio:'08:00',fim:'18:00',dur:50,intervalo:0},
   weekStart:null, weekStartC:null, cellSel:new Set(), slotsExist:new Map() };
 
-function toast(m,e=false){const t=$('#toast');t.textContent=m;t.className='toast show'+(e?' err':'');setTimeout(()=>t.className='toast',2800);}
+function toast(m,e=false,ms=2800){const t=$('#toast');t.textContent=m;t.className='toast show'+(e?' err':'');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.className='toast',ms);}
 function pad(n){return String(n).padStart(2,'0');}
 function isoDate(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
 function mondayOf(d){const x=new Date(d);const dow=(x.getDay()+6)%7;x.setDate(x.getDate()-dow);x.setHours(0,0,0,0);return x;}
 function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
 function hhmm(t){return t.slice(0,5);}
 
+// ===================== SESSÃO COMPARTILHADA ENTRE ABAS =====================
+// (bloco idêntico em index.html e psicologo.html)
+// As duas páginas dividem UMA sessão (STORAGE_KEY). Outra aba do mesmo navegador pode trocar de conta
+// ou sair a qualquer momento. Por isso cada tela lembra a conta que a montou (uidTela) e:
+//  - se a sessão do navegador passar a ser de outra conta (ou de nenhuma), a tela some e é recarregada,
+//    para nunca exibir dados de uma conta que não é a da sessão atual;
+//  - a troca de senha usa o token da conta CONFERIDA, nunca "a sessão que estiver no storage agora".
+let uidTela=null;   // conta dona do que está na tela (painel ou troca de senha); null = nada sensível
+let uidTroca=null;  // conta que abriu a tela de troca de senha
+const uidNoStorage = v => {        // id da conta gravada no storage; undefined = formato desconhecido
+  if(v==null) return null;
+  try{ const s=JSON.parse(v); return s===null ? null : (s?.user?.id ?? undefined); }catch(e){ return undefined; }
+};
+// conta gravada no storage agora (undefined = ilegível ou ausente). Só serve de apoio: se o navegador
+// bloquear o localStorage, o supabase-js guarda a sessão em memória e a chave nem existe.
+function contaNoStorage(){ try{ return uidNoStorage(localStorage.getItem(STORAGE_KEY)) ?? undefined; }catch(e){ return undefined; } }
+// conta da sessão atual, pelo supabase-js. uid: id | null (sem sessão) | undefined (não deu para saber).
+// Se getSession falhar sem sessão (ex.: token venceu e não há rede para renová-lo), a sessão continua
+// guardada: isso NÃO é troca de conta, então a resposta vem do storage (ou fica "não sei").
+async function contaDaSessao(){
+  let r; try{ r=await sb.auth.getSession(); }catch(e){ return { uid:contaNoStorage(), sessao:null, semRede:true }; }
+  const sessao=r?.data?.session||null;
+  if(!sessao && r?.error) return { uid:contaNoStorage(), sessao:null, semRede:true };
+  return { uid:sessao?.user?.id ?? null, sessao, semRede:false };
+}
+// a sessão passou a ser, com certeza, de OUTRA conta (ou de nenhuma)? então recarrega e devolve true
+async function trocouDeConta(){
+  if(!uidTela) return false;
+  const { uid }=await contaDaSessao();
+  if(uid!==undefined && uid!==uidTela){ sessaoMudou(); return true; }
+  return false;
+}
+function guardarAviso(msg){ try{ if(msg) sessionStorage.setItem('avisoLogin', msg); }catch(e){} }
+// a página chegou a uma tela estável (painel, login ou troca de senha): zera os saltos e mostra o aviso
+function telaPronta(){
+  SALTO=0;
+  let m=null; try{ m=sessionStorage.getItem('avisoLogin'); sessionStorage.removeItem('avisoLogin'); }catch(e){}
+  if(!m) return;
+  const le=$('#loginErr'); if(le) le.textContent=m;
+  toast(m, true, 8000);
+}
+function sessaoMudou(aviso){
+  uidTela=null; uidTroca=null;
+  aviso=aviso||'A sessão deste navegador mudou em outra janela. Esta janela foi atualizada.';
+  // a recarga também conta como salto: se a sessão "mudar" várias vezes seguidas, para num erro estável
+  if(SALTO>=3){ erroEstavel(aviso); return; }
+  document.body.style.display='none';   // nada da conta anterior fica visível até recarregar
+  guardarAviso(aviso);
+  try{ history.replaceState(null,'',location.pathname+location.search+'#salto='+(SALTO+1)); }catch(e){}
+  location.reload();
+}
+async function conferirSessao(){
+  if(!uidTela) return;
+  const { uid }=await contaDaSessao();
+  if(uid===undefined) return;                 // não deu para saber: espera o próximo evento
+  if(uidTela && uid!==uidTela) sessaoMudou();
+}
+window.addEventListener('storage', e=>{
+  if(!uidTela || (e.key!==STORAGE_KEY && e.key!==null)) return;   // key null = storage limpo
+  const uid = e.key===null ? null : uidNoStorage(e.newValue);
+  if(uid===undefined){ conferirSessao(); return; }
+  if(uid!==uidTela) sessaoMudou();                                // renovação de token da mesma conta: ignora
+});
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') conferirSessao(); });
+window.addEventListener('focus', conferirSessao);
+window.addEventListener('pageshow', e=>{ if(e.persisted) conferirSessao(); });   // voltar/avançar do navegador
+
+// Encerra a sessão. Se o logout no servidor falhar, tenta o logout local. Quando foi a PESSOA que pediu
+// para sair (forcar), apaga a sessão deste navegador de qualquer jeito. Num logout automático (erro de
+// leitura), não apaga: uma falha de rede não deve derrubar as outras abas; o teto de saltos evita o laço.
+async function encerrarSessao(forcar=false){
+  uidTela=null; uidTroca=null;
+  let r; try{ r=await sb.auth.signOut(); }catch(e){ r={error:e}; }
+  if(!r?.error) return;
+  try{ r=await sb.auth.signOut({ scope:'local' }); }catch(e){ r={error:e}; }
+  if(!r?.error || !forcar) return;
+  try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+}
+
+// Redirecionamentos AUTOMÁTICOS entre / e /psicologo.html levam a contagem em #salto=N. A partir de 3
+// seguidos a página para e mostra um erro estável (com ação manual): nenhuma combinação de falhas gera laço.
+let SALTO=(()=>{
+  const m=location.hash.match(/^#salto=(\d+)$/);
+  if(m){ try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){} }
+  return m ? +m[1] : 0;
+})();
+// login manual ou troca de senha concluída não são saltos automáticos: a contagem recomeça
+// (telaPronta também zera quando a página chega a uma tela estável)
+function zerarSaltos(){ SALTO=0; }
+function redirecionar(url){
+  if(SALTO>=3) return false;
+  location.replace(url+'#salto='+(SALTO+1));
+  return true;
+}
+
+// ---- troca de senha obrigatória (1º login) ----
+function mostrarTrocaSenha(uid){
+  uidTroca=uid; uidTela=uid;
+  $('#loginScreen').classList.add('hidden');
+  $('#app').classList.add('hidden');
+  $('#trocaScreen').classList.remove('hidden');
+  telaPronta();
+}
+// chamada ao Supabase com o token de uma conta específica (e não com a sessão que estiver no storage)
+async function chamarComToken(token, caminho, metodo, corpo){
+  try{
+    const r=await fetch(SUPABASE_URL+caminho, { method:metodo,
+      headers:{ apikey:SUPABASE_ANON, Authorization:'Bearer '+token, 'Content-Type':'application/json', Prefer:'return=minimal' },
+      body:JSON.stringify(corpo) });
+    if(r.ok) return { error:null };
+    let j={}; try{ j=await r.json(); }catch(e){}
+    return { error:{ message: j.msg||j.message||j.error_description||j.error||('HTTP '+r.status) } };
+  }catch(e){ return { error:{ message:'sem conexão ('+e.message+')' } }; }
+}
+async function trocarSenha(){
+  const s1=$('#novaSenha').value, s2=$('#novaSenha2').value;
+  const err=$('#trocaErr'); err.textContent='';
+  if(!s1||s1.length<6){ err.textContent='A senha deve ter ao menos 6 caracteres.'; return; }
+  if(s1!==s2){ err.textContent='As senhas não coincidem.'; return; }
+  const btn=$('#btnTrocarSenha'); btn.disabled=true; btn.textContent='Salvando…';
+  try{
+    // a troca vale só para a conta que abriu esta tela: confere a sessão ATUAL e usa o token DELA
+    const { uid:uidSessao, sessao, semRede }=await contaDaSessao();
+    if(uidTroca && semRede && (uidSessao===uidTroca || uidSessao===undefined)){
+      err.textContent='Sem conexão para confirmar sua sessão. Nada foi alterado; tente de novo.'; return;
+    }
+    if(!uidTroca || !sessao?.access_token || sessao.user?.id!==uidTroca){
+      sessaoMudou('Sua sessão mudou nesta janela (outra conta entrou ou saiu neste navegador). Por segurança, a senha NÃO foi trocada. Faça login de novo com a sua conta.');
+      return;
+    }
+    const uid=uidTroca, token=sessao.access_token;
+    // troca a senha (mesma chamada que o supabase-js faz, mas presa ao token conferido)
+    const r1=await chamarComToken(token, '/auth/v1/user', 'PUT', { password:s1 });
+    if(r1.error){ err.textContent='Erro: '+r1.error.message; return; }
+    // marca o perfil como não-provisório
+    const r2=await chamarComToken(token, '/rest/v1/perfis?id=eq.'+encodeURIComponent(uid), 'PATCH', { senha_provisoria:false });
+    if(r2.error){ err.textContent='Senha trocada, mas houve erro ao concluir: '+r2.error.message+'. Tente novamente.'; return; }
+    $('#trocaScreen').classList.add('hidden');
+    uidTroca=null;
+    zerarSaltos();
+    await enterApp(); // agora entra normal
+  }finally{ btn.disabled=false; btn.textContent='Salvar e entrar'; }
+}
+
 // ===== AUTH =====
 // sem sessão → login no index; com sessão inválida/sem acesso → encerra e volta ao index com o aviso
-async function checkSession(){const{data:{session}}=await sb.auth.getSession();if(session)await enterApp();else location.replace(LOGIN);}
-async function voltarAoLogin(msg){
-  await sb.auth.signOut();
-  try{ if(msg) sessionStorage.setItem('loginMsg',msg); }catch(e){}
-  location.replace(LOGIN);
+async function checkSession(){
+  const{data:{session}}=await sb.auth.getSession();
+  if(session) await enterApp();
+  else if(!redirecionar(LOGIN)) erroEstavel('Você não está conectado. Entre pela página de login.');
 }
+async function voltarAoLogin(msg){
+  await encerrarSessao();
+  guardarAviso(msg);
+  if(!redirecionar(LOGIN)) erroEstavel(msg);
+}
+// acesso recusado várias vezes seguidas: mostra o motivo e ações manuais, sem redirecionar de novo
+function erroEstavel(msg){
+  uidTela=null;
+  $('#app').classList.add('hidden'); $('#trocaScreen').classList.add('hidden');
+  $('#loginScreen').classList.remove('hidden');
+  $('#entradaMsg').textContent=msg+' (o acesso foi recusado várias vezes seguidas)';
+  $('#entradaAcoes').classList.remove('hidden');
+  $('#lnkLogin').classList.add('hidden'); // "Sair desta conta" já leva ao login
+}
+$('#btnTentarDeNovo').addEventListener('click',()=>location.reload());
+$('#btnSairEntrada').addEventListener('click',async()=>{await encerrarSessao(true);location.replace(LOGIN);});
 async function enterApp(){
+  uidTela=(await contaDaSessao()).uid||null;   // a guarda vale desde já (cobre a espera do getUser)
   const{data:ud,error:ue}=await sb.auth.getUser();
   if(ue||!ud?.user){await voltarAoLogin('Sessão expirada. Faça login novamente.');return;}
+  if(await trocouDeConta()) return;      // outra aba trocou de conta durante o getUser
+  uidTela=ud.user.id;
   const{data:perfis,error}=await sb.from('perfis').select('nome,papel,psicologo_id,senha_provisoria').eq('id',ud.user.id);
+  if(await trocouDeConta()) return;      // não monta nem encerra nada em nome de outra conta
   if(error){await voltarAoLogin('Erro ao ler perfil: '+error.message);return;}
   if(!perfis||!perfis.length){await voltarAoLogin('Perfil não encontrado.');return;}
   const p=perfis[0];
   // recepção aqui: volta ao index, que abre o painel admin (a sessão continua válida)
-  if(p.papel==='recepcao'){location.replace(LOGIN);return;}
+  if(p.papel==='recepcao'){ if(!redirecionar(LOGIN)) erroEstavel('Este é o painel do profissional; sua conta é da recepção.'); return; }
   if(p.papel!=='psicologo'||!p.psicologo_id){await voltarAoLogin('Este acesso não tem um cadastro de profissional vinculado.');return;}
   // 1º login: força troca de senha antes de entrar
-  if(p.senha_provisoria){ mostrarTrocaSenha(); return; }
+  if(p.senha_provisoria){ mostrarTrocaSenha(ud.user.id); return; }
   state.psicologoId=p.psicologo_id; state.nome=p.nome||'Profissional';
   // o selo mostra o PAPEL; o nome aparece na saudação e como dica (title)
   $('#userLabel').textContent='Profissional';
   $('#userLabel').title=state.nome; $('#userLabel').setAttribute('aria-label','Profissional: '+state.nome);
   $('#greeting').textContent='Olá, '+state.nome.split(' ')[0];
   $('#loginScreen').classList.add('hidden'); $('#app').classList.remove('hidden');
+  telaPronta();
   await loadGrade();
   state.weekStart=mondayOf(new Date()); state.weekStartC=mondayOf(new Date());
   await renderWeek(); 
   loadFeedbackCount();
 }
-function mostrarTrocaSenha(){
-  $('#loginScreen').classList.add('hidden');
-  $('#app').classList.add('hidden');
-  $('#trocaScreen').classList.remove('hidden');
-}
-$('#btnTrocarSenha').addEventListener('click', async ()=>{
-  const s1=$('#novaSenha').value, s2=$('#novaSenha2').value;
-  const err=$('#trocaErr'); err.textContent='';
-  if(!s1||s1.length<6){ err.textContent='A senha deve ter ao menos 6 caracteres.'; return; }
-  if(s1!==s2){ err.textContent='As senhas não coincidem.'; return; }
-  const btn=$('#btnTrocarSenha'); btn.disabled=true; btn.textContent='Salvando…';
-  const { error:e1 } = await sb.auth.updateUser({ password: s1 });
-  if(e1){ btn.disabled=false; btn.textContent='Salvar e entrar'; err.textContent='Erro: '+e1.message; return; }
-  const uid=(await sb.auth.getUser()).data.user.id;
-  const { error:e2 } = await sb.from('perfis').update({ senha_provisoria:false }).eq('id', uid);
-  btn.disabled=false; btn.textContent='Salvar e entrar';
-  if(e2){ err.textContent='Senha trocada, mas houve erro ao concluir: '+e2.message+'. Tente novamente.'; return; }
-  $('#trocaScreen').classList.add('hidden');
-  await enterApp();
-});
+$('#btnTrocarSenha').addEventListener('click', trocarSenha);
 
 // Enter em qualquer campo envia (o botão é type=submit; a lógica fica no click do botão)
 $('#trocaForm').addEventListener('submit',e=>e.preventDefault());
-$('#btnLogout').addEventListener('click',async()=>{await sb.auth.signOut();location.replace(LOGIN);});
+$('#btnLogout').addEventListener('click',async()=>{await encerrarSessao(true);location.replace(LOGIN);});
 
 // ===== TABS =====
 $$('.tab').forEach(t=>t.addEventListener('click',()=>{
