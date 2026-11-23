@@ -824,6 +824,9 @@ function guardaBarraMobile(barSel,abaSel){
   document.addEventListener('focusin',e=>{
     const el=e.target;
     if(origem==='ponteiro'&&tocado instanceof Node&&el instanceof Node&&el.contains(tocado)) return;
+    // foco que só VOLTA ao campo porque o calendário/seletor de hora fechou (veio de dentro do popover): não rola.
+    // O picker fecha no pointerdown de um toque fora dele; rolar aqui tiraria o alvo de baixo do dedo.
+    if(e.relatedTarget instanceof Element&&e.relatedTarget.closest('.dp-pop,.tp-pop')) return;
     if(!(el instanceof Element)||bar.contains(el)||el.closest('.modal-bg,.dp-pop,.tp-pop')) return;
     requestAnimationFrame(()=>ajusta(el));    // depois da rolagem nativa do foco
   });
