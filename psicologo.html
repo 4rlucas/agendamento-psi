@@ -814,12 +814,16 @@ function guardaBarraMobile(barSel,abaSel){
     else if(r.top<piso) d=r.top-piso;
     if(d) window.scrollBy({top:d,behavior:'instant'});
   };
-  // foco vindo de toque/clique não precisa de ajuste (o elemento tocado está visível) e rolar aí atrapalharia
-  // o picker, que abre no clique e se reposiciona a cada rolagem; o ajuste é para Tab, setas e foco devolvido
-  let toque=0; document.addEventListener('pointerdown',()=>{ toque=performance.now(); },true);
+  // Origem do foco (não o tempo): a última interação foi tecla ou toque/clique? Foco por TECLADO (Tab, setas,
+  // Esc devolvendo o foco ao fechar modal), programático ou sem interação prévia → sempre confere e rola.
+  // Só pula quando o foco veio de toque/clique NO PRÓPRIO elemento tocado: ele já está visível, e rolar ali
+  // faria o picker (abre no clique e se reposiciona a cada rolagem) mudar de lugar.
+  let origem='teclado', tocado=null;
+  document.addEventListener('keydown',()=>{ origem='teclado'; tocado=null; },true);
+  document.addEventListener('pointerdown',e=>{ origem='ponteiro'; tocado=e.target; },true);
   document.addEventListener('focusin',e=>{
     const el=e.target;
-    if(performance.now()-toque<800) return;
+    if(origem==='ponteiro'&&tocado instanceof Node&&el instanceof Node&&el.contains(tocado)) return;
     if(!(el instanceof Element)||bar.contains(el)||el.closest('.modal-bg,.dp-pop,.tp-pop')) return;
     requestAnimationFrame(()=>ajusta(el));    // depois da rolagem nativa do foco
   });
